@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"encoding/json"
+	"github.com/oarkflow/frame/server/render"
 	"github.com/oarkflow/protocol/http"
 	"github.com/oarkflow/protocol/smpp"
 	"github.com/oarkflow/protocol/smtp"
@@ -65,8 +66,8 @@ type Service interface {
 	Queue(payload Payload) (Response, error)
 }
 
-func NewSMTP(config smtp.Config) (*SMTP, error) {
-	return &SMTP{mailer: smtp.New(config), Config: config}, nil
+func NewSMTP(config smtp.Config, engine *render.HtmlEngine) (*SMTP, error) {
+	return &SMTP{mailer: smtp.New(config, engine), Config: config}, nil
 }
 
 func NewHTTP(config *http.Options) (*HTTP, error) {

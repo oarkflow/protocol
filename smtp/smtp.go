@@ -3,65 +3,69 @@ package smtp
 import (
 	"crypto/rand"
 	"fmt"
+	"github.com/oarkflow/errors"
+	"github.com/oarkflow/frame/pkg/common/bytebufferpool"
+	"github.com/oarkflow/frame/pkg/common/utils"
+	"github.com/oarkflow/frame/server/render"
+	"github.com/oarkflow/log/fqdn"
 	"math"
 	"math/big"
 	"os"
+	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/template/html"
-	"github.com/sujit-baniya/log"
-	"github.com/valyala/bytebufferpool"
+	"github.com/oarkflow/log"
 	sMail "github.com/xhit/go-simple-mail/v2"
 )
 
 var maxBigInt = big.NewInt(math.MaxInt64)
 
 type Config struct {
-	Host        string `mapstructure:"MAIL_HOST" json:"host" yaml:"host" env:"MAIL_HOST"`
-	Username    string `mapstructure:"MAIL_USERNAME" json:"username" yaml:"username" env:"MAIL_USERNAME"`
-	Password    string `mapstructure:"MAIL_PASSWORD" json:"password" yaml:"password" env:"MAIL_PASSWORD"`
-	Encryption  string `mapstructure:"MAIL_ENCRYPTION" json:"encryption" yaml:"encryption" env:"MAIL_ENCRYPTION"`
-	FromAddress string `mapstructure:"MAIL_FROM_ADDRESS" json:"from_address" yaml:"from_address" env:"MAIL_FROM_ADDRESS"`
-	FromName    string `mapstructure:"MAIL_FROM_NAME" json:"from_name" yaml:"from_name" env:"MAIL_FROM_NAME"`
-	EmailLayout string `mapstructure:"MAIL_LAYOUT" json:"layout" yaml:"layout" env:"MAIL_LAYOUT"`
-	Port        int    `mapstructure:"MAIL_PORT" json:"port" yaml:"port" env:"MAIL_PORT"`
+	Host        string `json:"host" yaml:"host" env:"MAIL_HOST"`
+	Username    string `json:"username" yaml:"username" env:"MAIL_USERNAME"`
+	Password    string `json:"password" yaml:"password" env:"MAIL_PASSWORD"`
+	Encryption  string `json:"encryption" yaml:"encryption" env:"MAIL_ENCRYPTION"`
+	FromAddress string `json:"from_address" yaml:"from_address" env:"MAIL_FROM_ADDRESS"`
+	FromName    string `json:"from_name" yaml:"from_name" env:"MAIL_FROM_NAME"`
+	EmailLayout string `json:"layout" yaml:"layout" env:"MAIL_LAYOUT"`
+	Port        int    `json:"port" yaml:"port" env:"MAIL_PORT"`
 }
 
-type Mail struct {
+type Mailer struct {
 	*sMail.SMTPServer
 	*sMail.SMTPClient
-	*html.Engine
+	*render.HtmlEngine
 	Config Config
 }
 
 type Attachment struct {
 	Data     []byte
 	File     string
+	FileName string
 	MimeType string
 }
 
-type Message struct {
-	To          string       `json:"to,omitempty"`
+type Mail struct {
+	To          []string     `json:"to,omitempty"`
 	From        string       `json:"from,omitempty"`
 	Subject     string       `json:"subject,omitempty"`
 	Body        string       `json:"body,omitempty"`
-	Cc          string       `json:"cc,omitempty"`
+	Bcc         []string     `json:"bcc,omitempty"`
+	Cc          []string     `json:"cc,omitempty"`
 	Attachments []Attachment `json:"attachments,omitempty"`
+	AttachFiles []Attachment `json:"attach_files"`
+	engine      *render.HtmlEngine
 }
 
-var DefaultMailer *Mail
-var TemplateEngine *html.Engine
+var DefaultMailer *Mailer
 
-func Default(cfg Config, templateEngine ...*html.Engine) {
-	DefaultMailer = New(cfg, templateEngine...)
+func Default(cfg Config, templateEngine *render.HtmlEngine) {
+	DefaultMailer = New(cfg, templateEngine)
 }
 
-func New(cfg Config, templateEngine ...*html.Engine) *Mail {
-	if len(templateEngine) > 0 {
-		TemplateEngine = templateEngine[0]
-	}
-	m := &Mail{Config: cfg}
+func New(cfg Config, templateEngine *render.HtmlEngine) *Mailer {
+	m := &Mailer{Config: cfg}
+	m.HtmlEngine = templateEngine
 	m.SMTPServer = sMail.NewSMTPClient()
 	m.SMTPServer.Host = cfg.Host
 	m.SMTPServer.Port = cfg.Port
@@ -81,7 +85,7 @@ func New(cfg Config, templateEngine ...*html.Engine) *Mail {
 	return m
 }
 
-func (m *Mail) Send(msg Message, includeMessageID ...bool) error {
+func (m *Mailer) Send(msg Mail) error {
 	var err error
 	m.SMTPClient, err = m.SMTPServer.Connect()
 	if err != nil {
@@ -91,16 +95,15 @@ func (m *Mail) Send(msg Message, includeMessageID ...bool) error {
 	defer m.SMTPClient.Close()
 	//New email simple html with inline and CC
 	email := sMail.NewMSG()
-	if len(includeMessageID) > 0 && includeMessageID[0] {
-		id, _ := generateMessageID()
-		email.AddHeader("Message-Id", id)
-	}
 	if msg.From == "" {
 		msg.From = fmt.Sprintf("%s<%s>", m.Config.FromName, m.Config.FromAddress)
 	}
-	email.SetFrom(msg.From).AddTo(msg.To).SetSubject(msg.Subject)
-	if msg.Cc != "" { //nolint:wsl
-		email.AddCc(msg.Cc)
+	email.SetFrom(msg.From).AddTo(msg.To...).SetSubject(msg.Subject)
+	if len(msg.Cc) > 0 { //nolint:wsl
+		email.AddCc(msg.Cc...)
+	}
+	if len(msg.Bcc) > 0 { //nolint:wsl
+		email.AddBcc(msg.Bcc...)
 	}
 	// txt, _ := html2text.FromString(body, html2text.Options{PrettyTables: false})
 	// email.AddAlternative(sMail.TextPlain, txt)
@@ -108,42 +111,75 @@ func (m *Mail) Send(msg Message, includeMessageID ...bool) error {
 	for _, attachment := range msg.Attachments {
 		email.AddAttachmentData(attachment.Data, attachment.File, attachment.MimeType)
 	}
+	for _, attachment := range msg.AttachFiles {
+		email.AddAttachment(attachment.File, attachment.FileName)
+	}
 
 	//Call Send and pass the client
 	err = email.Send(m.SMTPClient)
 	if err != nil {
-		fmt.Println(err.Error())
 		return err
 	} else {
-		log.Info().Msg("Email Sent to " + msg.To)
+		log.Info().Msg("Email Sent to " + strings.Join(msg.To, ", "))
 	}
 	return nil
 }
 
-func View(view string, body fiber.Map) *Body {
-	bodyContent := &Body{Content: Html(view, body)}
+func (m *Mailer) View(view string, body utils.H) *Body {
+	buf := bytebufferpool.Get()
+	defer bytebufferpool.Put(buf)
+	if err := m.Render(buf, view, body, m.Config.EmailLayout); err != nil {
+		panic(err)
+	}
+	bodyContent := &Body{Content: buf.String(), mailer: m}
 	return bodyContent
 }
 
-func Html(view string, body fiber.Map) string {
+func (m *Mailer) Html(view string, body utils.H) string {
 	buf := bytebufferpool.Get()
 	defer bytebufferpool.Put(buf)
-	if err := TemplateEngine.Render(buf, view, body, DefaultMailer.Config.EmailLayout); err != nil {
+	if err := m.Render(buf, view, body, DefaultMailer.Config.EmailLayout); err != nil {
 		panic(err)
 	}
 	return buf.String()
 }
 
-func Send(msg Message) error {
+func View(view string, body utils.H) *Body {
+	bodyContent := &Body{Content: Html(view, body)}
+	return bodyContent
+}
+
+func Html(view string, body utils.H) string {
+	buf := bytebufferpool.Get()
+	defer bytebufferpool.Put(buf)
+	if err := DefaultMailer.Render(buf, view, body, DefaultMailer.Config.EmailLayout); err != nil {
+		panic(err)
+	}
+	return buf.String()
+}
+
+func Send(msg Mail) error {
 	return DefaultMailer.Send(msg)
 }
 
 type Body struct {
 	Content string
+	mailer  *Mailer
 }
 
-func (t *Body) Send(msg Message) error {
+func SendMail(config Config, msg Mail) error {
+	mailer := New(config, nil)
+	return mailer.Send(msg)
+}
+
+func (t *Body) Send(msg Mail) error {
 	msg.Body = t.Content
+	if t.mailer != nil {
+		return t.mailer.Send(msg)
+	}
+	if DefaultMailer == nil {
+		return errors.New("No mailer configured")
+	}
 	return DefaultMailer.Send(msg)
 }
 
@@ -154,67 +190,11 @@ func generateMessageID() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	h, err := os.Hostname()
+	h, err := fqdn.Hostname()
 	// If we can't get the hostname, we'll use localhost
 	if err != nil {
 		h = "localhost.localdomain"
 	}
 	msgid := fmt.Sprintf("<%d.%d.%d@%s>", t, pid, rint, h)
 	return msgid, nil
-}
-
-func SendPasswordResetEmail(email string, formattedEmail string, baseURL string, serverKey string) error {
-	resetLink := GeneratePasswordResetURL(formattedEmail, baseURL, serverKey)
-	err := View("emails/password-reset", fiber.Map{
-		"reset_link": resetLink,
-	}).Send(Message{
-		To:      email,
-		Subject: "You asked to reset. Please click here.",
-	})
-	if err != nil {
-		fmt.Println("Retrying sending password reset email: " + email)
-		SendPasswordResetEmail(email, formattedEmail, baseURL, serverKey)
-	}
-	return err
-}
-func SendNewAccountEmail(email string, password string, baseURL string, serverKey string) error {
-	resetEmail := fmt.Sprintf("%s-reset-%d", email, time.Now().Unix())
-	resetLink := GeneratePasswordResetURL(resetEmail, baseURL, serverKey)
-	err := View("emails/new-user", fiber.Map{
-		"reset_link": resetLink,
-		"password":   password,
-	}).Send(Message{
-		To:      email,
-		Subject: "Your new account is here!",
-	})
-	if err != nil {
-		fmt.Println("Retrying sending new account email: " + email)
-		SendNewAccountEmail(email, password, baseURL, serverKey)
-	}
-	return err
-}
-
-func SendConfirmationEmail(email, baseURL, token string) error {
-	confirmLink := GenerateConfirmURL(email, baseURL, token)
-	err := View("emails/confirm", fiber.Map{
-		"confirm_link": confirmLink,
-	}).Send(Message{
-		To:      email,
-		Subject: "Please confirm if it is you.",
-	})
-	if err != nil {
-		fmt.Println("Retrying sending confirmation email: " + email)
-		SendConfirmationEmail(email, baseURL, token)
-	}
-	return err
-}
-
-func GenerateConfirmURL(email, baseURL, token string) string {
-	uri := fmt.Sprintf("%s/verify-email?t=%s", baseURL, token)
-	return uri
-}
-
-func GeneratePasswordResetURL(email, baseURL, token string) string {
-	uri := fmt.Sprintf("%s/reset-password?t=%s", baseURL, token)
-	return uri
 }

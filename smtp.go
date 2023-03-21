@@ -6,7 +6,7 @@ import (
 )
 
 type SMTP struct {
-	mailer *smtp.Mail
+	mailer *smtp.Mailer
 	Config smtp.Config
 }
 
@@ -27,12 +27,12 @@ func (s *SMTP) Handle(payload Payload) (Response, error) {
 	if payload.From != "" {
 		from = fmt.Sprintf("%s<%s>", payload.From, from)
 	}
-	err := s.mailer.Send(smtp.Message{
-		To:          payload.To,
+	err := s.mailer.Send(smtp.Mail{
+		To:          []string{payload.To},
 		From:        from,
 		Subject:     payload.Subject,
 		Body:        payload.Message,
-		Cc:          payload.Cc,
+		Cc:          []string{payload.Cc},
 		Attachments: payload.Attachments,
 	})
 	if err != nil {
