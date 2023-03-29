@@ -7,8 +7,8 @@ require (
 	github.com/oarkflow/errors v0.0.6
 	github.com/oarkflow/frame v0.0.36
 	github.com/oarkflow/log v1.0.73
+	github.com/oarkflow/xid v1.2.5
 	github.com/puzpuzpuz/xsync v1.5.2
-	github.com/rs/xid v1.4.0
 	github.com/xhit/go-simple-mail/v2 v2.13.0
 	golang.org/x/net v0.8.0
 	golang.org/x/text v0.8.0

@@ -3,20 +3,22 @@ package smpp
 import (
 	"context"
 	"fmt"
-	"github.com/oarkflow/errors"
-	"github.com/oarkflow/protocol/smpp/balancer"
-	"github.com/oarkflow/protocol/smpp/pdu"
-	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
-	"github.com/oarkflow/protocol/smpp/pdu/pdutext"
-	"github.com/puzpuzpuz/xsync"
-	"github.com/rs/xid"
-	"golang.org/x/time/rate"
 	"log"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/oarkflow/errors"
+	"github.com/oarkflow/xid"
+	"github.com/puzpuzpuz/xsync"
+	"golang.org/x/time/rate"
+
+	"github.com/oarkflow/protocol/smpp/balancer"
+	"github.com/oarkflow/protocol/smpp/pdu"
+	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
+	"github.com/oarkflow/protocol/smpp/pdu/pdutext"
 )
 
 type Auth struct {
