@@ -9,16 +9,17 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/oarkflow/protocol/smpp/manager"
-	"github.com/oarkflow/protocol/smpp/pdu"
-	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
-	"github.com/oarkflow/protocol/smpp/pdu/pdutext"
-	"github.com/oarkflow/protocol/smpp/pdu/pdutlv"
 	"math/rand"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/oarkflow/protocol/smpp/manager"
+	"github.com/oarkflow/protocol/smpp/pdu"
+	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
+	"github.com/oarkflow/protocol/smpp/pdu/pdutext"
+	"github.com/oarkflow/protocol/smpp/pdu/pdutlv"
 )
 
 // ErrMaxWindowSize is returned when an operation (such as Submit) violates
@@ -388,6 +389,67 @@ func (t *Transmitter) do(p pdu.Body) (*tx, error) {
 	case <-t.cl.respTimeout():
 		return nil, ErrTimeout
 	}
+}
+
+func (t *Transmitter) SubmitLongMsg8bit(sm *ShortMessage) ([]ShortMessage, error) {
+	maxLen := 134 // 140-6 (UDH)
+	rawMsg := sm.Text.Encode()
+	countParts := int((len(rawMsg)-1)/maxLen) + 1
+	ri := uint8(t.r.Intn(128))
+	UDHHeader := make([]byte, 6)
+	UDHHeader[0] = 5
+	UDHHeader[1] = 0
+	UDHHeader[2] = 3
+	UDHHeader[3] = ri
+	UDHHeader[4] = uint8(countParts)
+	responses := []ShortMessage{}
+	for i := 0; i < countParts; i++ {
+		UDHHeader[5] = uint8(i + 1) // current message part
+		p := pdu.NewSubmitSM(sm.TLVFields, t.manager)
+		f := p.Fields()
+		f.Set(pdufield.SourceAddr, sm.Src)
+		f.Set(pdufield.DestinationAddr, sm.Dst)
+		if i != countParts-1 {
+			f.Set(pdufield.ShortMessage, pdutext.Raw(append(UDHHeader, rawMsg[i*maxLen:(i+1)*maxLen]...)))
+		} else {
+			f.Set(pdufield.ShortMessage, pdutext.Raw(append(UDHHeader, rawMsg[i*maxLen:]...)))
+		}
+		f.Set(pdufield.RegisteredDelivery, uint8(sm.Register))
+		if sm.Validity != time.Duration(0) {
+			f.Set(pdufield.ValidityPeriod, convertValidity(sm.Validity))
+		}
+		f.Set(pdufield.ServiceType, sm.ServiceType)
+		f.Set(pdufield.SourceAddrTON, sm.SourceAddrTON)
+		f.Set(pdufield.SourceAddrNPI, sm.SourceAddrNPI)
+		f.Set(pdufield.DestAddrTON, sm.DestAddrTON)
+		f.Set(pdufield.DestAddrNPI, sm.DestAddrNPI)
+		f.Set(pdufield.ESMClass, 0x40)
+		f.Set(pdufield.ProtocolID, sm.ProtocolID)
+		f.Set(pdufield.PriorityFlag, sm.PriorityFlag)
+		f.Set(pdufield.ScheduleDeliveryTime, sm.ScheduleDeliveryTime)
+		f.Set(pdufield.ReplaceIfPresentFlag, sm.ReplaceIfPresentFlag)
+		f.Set(pdufield.SMDefaultMsgID, sm.SMDefaultMsgID)
+		f.Set(pdufield.DataCoding, uint8(sm.Text.Type()))
+		//set the optional parameters in the submit pdu from sm
+		optParams := p.TLVFields()
+		for tag, value := range sm.TLVFields {
+			err := optParams.Set(tag, value)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		resp, err := t.do(p)
+		if err != nil {
+			return nil, err
+		}
+		sm.resp.Lock()
+		sm.resp.p = resp.PDU
+		sm.resp.Unlock()
+		// checking for errors in the responses will be left to the client
+		responses = append(responses, *sm)
+	}
+	return responses, nil
 }
 
 // SubmitLongMsg sends a long message (more than 140 bytes)
