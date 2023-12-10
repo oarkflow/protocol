@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/oarkflow/protocol/smpp"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
@@ -19,11 +18,15 @@ func main() {
 			Password: "Ver!12@$",
 		},
 		Register: pdufield.FinalDeliveryReceipt,
+		OnMessageReport: func(manager *smpp.Manager, sms *smpp.Message) {
+			fmt.Println("Message Delivered")
+		},
 	}
 	manager, err := smpp.NewManager(setting)
 	if err != nil {
 		panic(err)
 	}
+
 	for i := 0; i < 2; i++ {
 		msg := smpp.Message{
 			Message: fmt.Sprintf("नेकपा माओवादी केन्द्रका अध्यक्ष एवं पूर्वप्रधानमन्त्री पुष्पकमल दाहालले आउँदो मंसिर ४ गतेको प्रदेश र प्रतिनिधिसभा निर्वाचनमा प्रतिगमन परास्त हुनेगरी जनताले एकता प्रदर्शन गर्नुपर्ने बताएका छन् । %d", i),
@@ -32,6 +35,5 @@ func main() {
 		}
 		manager.Send(msg)
 	}
-	time.Sleep(5 * time.Second)
-	fmt.Println(manager.GetMessages())
+	manager.Wait()
 }

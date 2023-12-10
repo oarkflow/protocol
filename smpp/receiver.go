@@ -8,11 +8,12 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/oarkflow/protocol/smpp/manager"
 	"github.com/oarkflow/protocol/smpp/pdu"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
-	"sync"
-	"time"
 )
 
 // Receiver implements an SMPP client receiver.
@@ -50,7 +51,7 @@ type Receiver struct {
 // when a new PDU arrives.
 type HandlerFunc func(p pdu.Body)
 
-// MergeHolder is a struct which holds the slice of Parts for the merging of a long incoming message.
+// MergeHolder is a struct which holds the slice of Part for the merging of a long incoming message.
 type MergeHolder struct {
 	MessageID     int
 	MessageParts  []*MessagePart // Slice with the parts of the message

@@ -128,7 +128,7 @@ func (v *Variable) SerializeTo(w io.Writer) error {
 	return err
 }
 
-// SM is a PDU field used for Short Messages.
+// SM is a PDU field used for Short messages.
 type SM struct {
 	Data []byte
 }

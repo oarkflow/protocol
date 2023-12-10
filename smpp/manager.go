@@ -2,14 +2,20 @@ package smpp
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"github.com/oarkflow/errors"
 	"github.com/oarkflow/log"
+	"github.com/oarkflow/pkg/str"
 	"golang.org/x/time/rate"
 
 	"github.com/oarkflow/protocol/smpp/balancer"
@@ -40,7 +46,6 @@ type Setting struct {
 	Balancer             balancer.Balancer        `json:"balancer,omitempty"`
 	Throttle             int                      `json:"throttle,omitempty"`
 	UseAllConnection     bool                     `json:"use_all_connection,omitempty"`
-	HandlePDU            func(p pdu.Body)         `json:"handle_pdu,omitempty"`
 	AutoRebind           bool                     `json:"auto_rebind,omitempty"`
 	Validity             time.Duration            `json:"validity,omitempty"`
 	Register             pdufield.DeliverySetting `json:"register,omitempty"`
@@ -50,6 +55,8 @@ type Setting struct {
 	PriorityFlag         uint8                    `json:"priority_flag,omitempty"`
 	ScheduleDeliveryTime string                   `json:"schedule_delivery_time,omitempty"`
 	ReplaceIfPresentFlag uint8                    `json:"replace_if_present_flag,omitempty"`
+	HandlePDU            func(p pdu.Body)
+	OnMessageReport      func(manager *Manager, sms *Message)
 }
 
 type Manager struct {
@@ -59,28 +66,31 @@ type Manager struct {
 	ctx                    context.Context
 	setting                Setting
 	connections            map[string]*Transceiver
-	Balancer               balancer.Balancer
+	balancer               balancer.Balancer
 	connIDs                []string
 	mu                     sync.RWMutex
-	Messages               *maps.Map[string, Message]
-	Parts                  *maps.Map[string, Parts]
+	messages               *maps.Map[string, *Message]
+	parts                  *maps.Map[string, *Part]
+	messageParts           *maps.Map[string, string]
 	lastMessageTS          time.Time
 	lastDeliveredMessageTS time.Time
 }
 
 type Message struct {
-	From          string `json:"from,omitempty"`
-	To            string `json:"to,omitempty"`
-	ID            string `json:"id"`
-	Message       string `json:"message,omitempty"`
-	MessageID     string `json:"message_id,omitempty"`
-	MessageStatus string `json:"message_status,omitempty"`
-	Error         string `json:"error,omitempty"`
-	Parts         *maps.Map[string, Parts]
-	MessageParts  []Parts
+	From           string       `json:"from,omitempty"`
+	To             string       `json:"to,omitempty"`
+	ID             string       `json:"id"`
+	Message        string       `json:"message,omitempty"`
+	MessageID      string       `json:"message_id,omitempty"`
+	MessageStatus  string       `json:"message_status,omitempty"`
+	Error          string       `json:"error,omitempty"`
+	TotalParts     atomic.Int32 `json:"total_parts"`
+	SentParts      atomic.Int32 `json:"sent_parts"`
+	FailedParts    atomic.Int32 `json:"failed_parts"`
+	DeliveredParts atomic.Int32 `json:"delivered_parts"`
 }
 
-type Parts struct {
+type Part struct {
 	ID            string `json:"id"`
 	SmsMessageID  string `json:"sms_message_id"`
 	Message       string `json:"message,omitempty"`
@@ -89,21 +99,52 @@ type Parts struct {
 	Error         string `json:"error,omitempty"`
 }
 
+const (
+	DELIVERED string = "DELIVERED"
+	FAILED    string = "FAILED"
+)
+
 func DefaultPDUHandler(p pdu.Body) {
 	if msgStatus, ok := p.Fields()[pdufield.ShortMessage]; ok {
 		response := Unmarshal(msgStatus.String())
-		if _, ok := p.Manager().GetPart(response.Id); ok {
+		manager := p.Manager().(*Manager)
+		if part, ok := manager.parts.Get(response.ID); ok {
 			var status string
 			switch response.Stat {
 			case "DELIVRD":
-				status = "DELIVERED"
-				p.Manager().SetLastDeliveredMessage()
+				status = DELIVERED
+				manager.SetLastDeliveredMessage()
 				break
 			default:
 				status = response.Stat
 			}
-			p.Manager().UpdatePart(response.Id, status, response.Err)
-			// p.Manager().DeletePart(response.Id)
+			part.MessageStatus = status
+			part.Error = response.Err
+			manager.parts.Set(response.ID, part)
+			if smsID, mExists := manager.messageParts.Get(response.ID); mExists {
+				if sms, exists := manager.messages.Get(smsID); exists {
+					sms.SentParts.Add(-1)
+					if status == DELIVERED {
+						sms.DeliveredParts.Add(1)
+					} else {
+						sms.FailedParts.Add(1)
+					}
+					totalParts := sms.TotalParts.Load()
+					failedParts := sms.FailedParts.Load()
+					deliveredParts := sms.DeliveredParts.Load()
+					if totalParts == (failedParts + deliveredParts) {
+						if failedParts > 0 {
+							sms.MessageStatus = FAILED
+						} else {
+							sms.MessageStatus = DELIVERED
+						}
+					}
+					manager.messages.Set(smsID, sms)
+					if sms.MessageStatus != "" && manager.setting.OnMessageReport != nil {
+						manager.setting.OnMessageReport(manager, sms)
+					}
+				}
+			}
 		}
 	}
 }
@@ -133,20 +174,21 @@ func NewManager(setting Setting) (*Manager, error) {
 		}
 	}
 	manager := &Manager{
-		Name:        setting.Name,
-		Slug:        setting.Slug,
-		ID:          id,
-		ctx:         context.Background(),
-		connections: make(map[string]*Transceiver),
-		Messages:    maps.New[string, Message](),
-		Parts:       maps.New[string, Parts](),
+		Name:         setting.Name,
+		Slug:         setting.Slug,
+		ID:           id,
+		ctx:          context.Background(),
+		connections:  make(map[string]*Transceiver),
+		messages:     maps.New[string, *Message](),
+		parts:        maps.New[string, *Part](),
+		messageParts: maps.New[string, string](),
 	}
 
 	if setting.HandlePDU == nil {
 		setting.HandlePDU = DefaultPDUHandler
 	}
 	if setting.Balancer == nil {
-		manager.Balancer = &balancer.RoundRobin{}
+		manager.balancer = &balancer.RoundRobin{}
 	}
 	manager.setting = setting
 	return manager, nil
@@ -234,24 +276,19 @@ func (m *Manager) Rebind() error {
 }
 
 func (m *Manager) GetPart(key string) (any, bool) {
-	return m.Parts.Get(key)
+	return m.parts.Get(key)
 }
 
 func (m *Manager) UpdatePart(key, status, error string) {
-	if v, ok := m.Parts.Get(key); ok {
+	if v, ok := m.parts.Get(key); ok {
 		v.MessageStatus = status
 		v.Error = error
-		m.Parts.Set(key, v)
-		if va, o := m.Messages.Get(v.SmsMessageID); o {
-			v.MessageStatus = status
-			v.Error = error
-			va.Parts.Set(key, v)
-		}
+		m.parts.Set(key, v)
 	}
 }
 
 func (m *Manager) DeletePart(key string) {
-	m.Parts.Del(key)
+	m.parts.Del(key)
 }
 
 func (m *Manager) LastMessageAt() time.Time {
@@ -267,18 +304,10 @@ func (m *Manager) SetLastDeliveredMessage() {
 }
 
 func (m *Manager) GetMessages() (messages []any) {
-	f := func(key string, val Message) bool {
-		var parts []Parts
-		fp := func(key string, part Parts) bool {
-			parts = append(parts, part)
-			return true
-		}
-		val.Parts.ForEach(fp)
-		val.MessageParts = parts
+	m.messages.ForEach(func(key string, val *Message) bool {
 		messages = append(messages, val)
 		return true
-	}
-	m.Messages.ForEach(f)
+	})
 	return
 }
 
@@ -287,13 +316,12 @@ func (m *Manager) SetupConnection() error {
 	defer m.mu.Unlock()
 	// make persistent connection
 	tx := &Transceiver{
-		ID:         xid.New().String(),
-		Addr:       m.setting.URL,
-		User:       m.setting.Auth.SystemID,
-		Passwd:     m.setting.Auth.Password,
-		Handler:    m.setting.HandlePDU,
-		SystemType: m.setting.Auth.SystemType,
-
+		ID:                 xid.New().String(),
+		Addr:               m.setting.URL,
+		User:               m.setting.Auth.SystemID,
+		Passwd:             m.setting.Auth.Password,
+		Handler:            m.setting.HandlePDU,
+		SystemType:         m.setting.Auth.SystemType,
 		EnquireLink:        m.setting.EnquiryInterval,
 		EnquireLinkTimeout: m.setting.EnquiryTimeout,
 		RespTimeout:        15 * time.Minute,
@@ -328,7 +356,7 @@ func (m *Manager) GetConnection(conIds ...string) (any, error) {
 	var err error
 	var pickedID string
 	if len(conIds) > 0 { // pick among custom
-		pickedID, err = m.Balancer.Pick(conIds)
+		pickedID, err = m.balancer.Pick(conIds)
 		if err != nil {
 			return nil, err
 		}
@@ -338,7 +366,7 @@ func (m *Manager) GetConnection(conIds ...string) (any, error) {
 	}
 
 	// pick among managing session
-	pickedID, err = m.Balancer.Pick(m.connIDs)
+	pickedID, err = m.balancer.Pick(m.connIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -348,7 +376,7 @@ func (m *Manager) GetConnection(conIds ...string) (any, error) {
 	return nil, errors.New("no connection")
 }
 
-func (m *Manager) Send(payload interface{}, connectionId ...string) (any, error) {
+func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 	if len(m.connIDs) == 0 {
 		err := m.Start()
 		if err != nil {
@@ -360,12 +388,15 @@ func (m *Manager) Send(payload interface{}, connectionId ...string) (any, error)
 		return nil, err
 	}
 	tx := t.(*Transceiver)
-	sms := payload.(Message)
+	var sms *Message
+	switch payload := payload.(type) {
+	case Message:
+		sms = &payload
+	case *Message:
+		sms = payload
+	}
 	if sms.ID == "" {
 		sms.ID = xid.New().String()
-	}
-	if sms.Parts == nil {
-		sms.Parts = maps.New[string, Parts]()
 	}
 	encodedText, isLongMsg := pdutext.FindCoding([]byte(sms.Message))
 	srcTon, srcNpi := parseSrcPhone(sms.From)
@@ -391,58 +422,78 @@ func (m *Manager) Send(payload interface{}, connectionId ...string) (any, error)
 		ScheduleDeliveryTime: m.setting.ScheduleDeliveryTime,
 		ReplaceIfPresentFlag: m.setting.ReplaceIfPresentFlag,
 	}
-	m.Messages.Set(sms.ID, sms)
-	m.lastMessageTS = time.Now()
 	if isLongMsg {
 		sm, err := tx.SubmitLongMsg(shortMessage)
 		if err != nil {
-			sms.MessageStatus = "Unable to send: " + err.Error()
-			m.Messages.Set(sms.ID, sms)
+			sms.MessageStatus = FAILED
+			sms.Error = err.Error()
+			m.messages.Set(sms.ID, sms)
 			return nil, err
 		}
+		sms.TotalParts.Add(int32(len(sm)))
+		m.lastMessageTS = time.Now()
 		for _, s := range sm {
-			msg := Parts{
+			msg := &Part{
 				ID:           xid.New().String(),
 				SmsMessageID: sms.ID,
+				Message:      str.FromByte(s.Text.Decode()),
+				MessageID:    s.RespID(),
 			}
-			msg.MessageID = s.RespID()
 			if s.Resp().Header().Status == pdu.ESME_ROK {
 				msg.MessageStatus = "SENT"
+				sms.SentParts.Add(1)
 			} else {
 				msg.MessageStatus = "FAILED"
 				msg.Error = s.Resp().Header().Status.Error()
+				sms.FailedParts.Add(1)
 			}
-			m.Parts.Set(msg.MessageID, msg)
-			if curSms, ok := m.Messages.Get(sms.ID); ok {
-				curSms.Parts.Set(msg.MessageID, msg)
-			}
+			m.messageParts.Set(s.RespID(), sms.ID)
+			m.parts.Set(msg.MessageID, msg)
 		}
+		m.messages.Set(sms.ID, sms)
 	} else {
 		s, err := tx.Submit(shortMessage)
 		if err != nil {
-			sms.MessageStatus = "Unable to send: " + err.Error()
-			m.Messages.Set(sms.ID, sms)
+			sms.MessageStatus = FAILED
+			sms.Error = err.Error()
+			m.messages.Set(sms.ID, sms)
 			return nil, err
 		}
-		msg := Parts{
+		sms.TotalParts.Add(1)
+		msg := &Part{
 			ID:           xid.New().String(),
 			SmsMessageID: sms.ID,
 			Message:      string(s.Text.Encode()),
+			MessageID:    s.RespID(),
 		}
-		msg.MessageID = s.RespID()
 		if s.Resp().Header().Status == pdu.ESME_ROK {
 			msg.MessageStatus = "SENT"
+			sms.SentParts.Add(1)
 		} else {
 			msg.MessageStatus = "FAILED"
 			msg.Error = s.Resp().Header().Status.Error()
+			sms.FailedParts.Add(1)
 		}
-		m.Parts.Set(msg.MessageID, msg)
-		if curSms, ok := m.Messages.Get(sms.ID); ok {
-			curSms.Parts.Set(msg.MessageID, msg)
-		}
+		m.messageParts.Set(s.RespID(), sms.ID)
+		m.parts.Set(msg.MessageID, msg)
 	}
-	curSms, _ := m.Messages.Get(sms.ID)
+	curSms, _ := m.messages.Get(sms.ID)
 	return curSms, nil
+}
+
+func (m *Manager) Wait() {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	done := make(chan bool, 1)
+	go func() {
+		<-sigs
+		done <- true
+	}()
+
+	fmt.Println("Awaiting SMPP Manager")
+	<-done
+	m.Close()
+	fmt.Println("Exiting SMPP Manager")
 }
 
 func (m *Manager) Close(connectionId ...string) error {
@@ -519,7 +570,7 @@ func remove(s []string, r string) []string {
 }
 
 type GenericResponse struct {
-	Id         string `csv:"id" json:"id"`
+	ID         string `csv:"id" json:"id"`
 	Sub        string `csv:"sub" json:"sub"`
 	Dlvrd      string `csv:"dlvrd" json:"dlvrd"`
 	SubmitDate string `csv:"submit date" json:"submit date"`
@@ -545,7 +596,7 @@ func Unmarshal(msg string) GenericResponse {
 		}
 		switch field {
 		case "id":
-			response.Id = v
+			response.ID = v
 		case "sub":
 			response.Sub = v
 		case "dlvrd":
