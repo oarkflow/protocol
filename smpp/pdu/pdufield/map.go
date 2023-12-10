@@ -6,6 +6,7 @@ package pdufield
 
 import (
 	"fmt"
+
 	"github.com/oarkflow/protocol/smpp/pdu/pdutext"
 )
 
@@ -30,7 +31,9 @@ func (m Map) Set(k Name, v interface{}) error {
 	case string:
 		m[k] = New(k, []byte(v.(string)))
 	case []byte:
-		m[k] = New(k, []byte(v.([]byte)))
+		m[k] = New(k, v.([]byte))
+	case bool:
+		m[k] = &Flag{Data: v.(bool)}
 	case DeliverySetting:
 		m[k] = New(k, []byte{uint8(v.(DeliverySetting))})
 	case Body:

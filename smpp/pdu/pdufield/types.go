@@ -24,6 +24,7 @@ const (
 	DataCoding           Name = "data_coding"
 	DestAddrNPI          Name = "dest_addr_npi"
 	DestAddrTON          Name = "dest_addr_ton"
+	UDHHeader            Name = "udh_header"
 	DestinationAddr      Name = "destination_addr"
 	DestinationList      Name = "dest_addresses"
 	ESMClass             Name = "esm_class"
@@ -50,6 +51,7 @@ const (
 	SystemID             Name = "system_id"
 	SystemType           Name = "system_type"
 	UDHLength            Name = "gsm_sms_ud.udh.len"
+	UDHFlag              Name = "udh_flag"
 	GSMUserData          Name = "gsm_sms_ud.udh"
 	UnsuccessSme         Name = "unsuccess_sme"
 	ValidityPeriod       Name = "validity_period"
@@ -486,4 +488,37 @@ func (dt *Date) Parse() error {
 	dt.Absolute = time.Date(int(y)+2000, time.Month(m), int(d), int(h), int(i), int(s), int(ns), loc)
 
 	return nil
+}
+
+type Flag struct {
+	Data bool
+}
+
+func (f *Flag) Len() int {
+	return 1
+}
+
+func (f *Flag) Raw() interface{} {
+	return f.Data
+}
+
+func (f *Flag) String() string {
+	if f.Data {
+		return "true"
+	}
+
+	return "false"
+}
+
+func (f *Flag) Bytes() []byte {
+	if f.Data {
+		return []byte{0x01}
+	}
+
+	return []byte{0x00}
+}
+
+func (f *Flag) SerializeTo(w io.Writer) error {
+	_, err := w.Write(f.Bytes())
+	return err
 }

@@ -190,7 +190,7 @@ type ShortMessage struct {
 	Src      string
 	Dst      string
 	DstList  []string // List of destination addreses for submit multi
-	DLs      []string //List if destribution list for submit multi
+	DLs      []string // List if destribution list for submit multi
 	Text     pdutext.Codec
 	Validity time.Duration
 	Register pdufield.DeliverySetting
@@ -402,7 +402,7 @@ func (t *Transmitter) SubmitLongMsg8bit(sm *ShortMessage) ([]ShortMessage, error
 	UDHHeader[2] = 3
 	UDHHeader[3] = ri
 	UDHHeader[4] = uint8(countParts)
-	responses := []ShortMessage{}
+	var responses []ShortMessage
 	for i := 0; i < countParts; i++ {
 		UDHHeader[5] = uint8(i + 1) // current message part
 		p := pdu.NewSubmitSM(sm.TLVFields, t.manager)
@@ -430,7 +430,7 @@ func (t *Transmitter) SubmitLongMsg8bit(sm *ShortMessage) ([]ShortMessage, error
 		f.Set(pdufield.ReplaceIfPresentFlag, sm.ReplaceIfPresentFlag)
 		f.Set(pdufield.SMDefaultMsgID, sm.SMDefaultMsgID)
 		f.Set(pdufield.DataCoding, uint8(sm.Text.Type()))
-		//set the optional parameters in the submit pdu from sm
+		// set the optional parameters in the submit pdu from sm
 		optParams := p.TLVFields()
 		for tag, value := range sm.TLVFields {
 			err := optParams.Set(tag, value)
@@ -469,6 +469,11 @@ func (t *Transmitter) SubmitLongMsg(sm *ShortMessage) ([]ShortMessage, error) {
 		maxLen = 132 // to avoid a character being split between payloads
 		isUnicode = true
 		break
+	}
+	if sm.Text.Type() == pdutext.UCS2Type {
+		maxLen = 66 // to avoid a character being split between payloads
+	} else if sm.Text.Type() == pdutext.Latin1Type {
+		maxLen = 152 // to avoid a character being split between payloads
 	}
 	rawMsg := sm.Text.Encode()
 	countParts := int((len(rawMsg)-1)/maxLen) + 1
@@ -642,8 +647,8 @@ func (t *Transmitter) submitMsg(sm *ShortMessage, p pdu.Body, dataCoding uint8) 
 	f.Set(pdufield.SourceAddr, sm.Src)
 	f.Set(pdufield.DestinationAddr, sm.Dst)
 	tlv := p.TLVFields()
-	//According to SMPP protocol both `message_payload` and `short_message` fields should not be set
-	//at the same time. Hence setting `short_message` only when the `message_payload` is not set.
+	// According to SMPP protocol both `message_payload` and `short_message` fields should not be set
+	// at the same time. Hence setting `short_message` only when the `message_payload` is not set.
 	if tlv[pdutlv.TagMessagePayload] == nil {
 		f.Set(pdufield.ShortMessage, sm.Text)
 	}

@@ -103,7 +103,7 @@ func DefaultPDUHandler(p pdu.Body) {
 				status = response.Stat
 			}
 			p.Manager().UpdatePart(response.Id, status, response.Err)
-			p.Manager().DeletePart(response.Id)
+			// p.Manager().DeletePart(response.Id)
 		}
 	}
 }
