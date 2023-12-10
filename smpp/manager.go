@@ -2,8 +2,6 @@ package smpp
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -11,14 +9,15 @@ import (
 	"unicode/utf8"
 
 	"github.com/oarkflow/errors"
-	"github.com/oarkflow/xid"
-	"github.com/puzpuzpuz/xsync"
+	"github.com/oarkflow/log"
 	"golang.org/x/time/rate"
 
 	"github.com/oarkflow/protocol/smpp/balancer"
 	"github.com/oarkflow/protocol/smpp/pdu"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 	"github.com/oarkflow/protocol/smpp/pdu/pdutext"
+	"github.com/oarkflow/protocol/utils/maps"
+	"github.com/oarkflow/protocol/utils/xid"
 )
 
 type Auth struct {
@@ -28,32 +27,29 @@ type Auth struct {
 }
 
 type Setting struct {
-	Name             string
-	Slug             string
-	ID               string
-	URL              string
-	Auth             Auth
-	ReadTimeout      time.Duration
-	WriteTimeout     time.Duration
-	EnquiryInterval  time.Duration
-	EnquiryTimeout   time.Duration
-	MaxConnection    int
-	Balancer         balancer.Balancer
-	Throttle         int
-	UseAllConnection bool
-	HandlePDU        func(p pdu.Body)
-	AutoRebind       bool
-
-	Validity time.Duration
-	Register pdufield.DeliverySetting
-
-	// Other fields, normally optional.
-	ServiceType          string
-	ESMClass             uint8
-	ProtocolID           uint8
-	PriorityFlag         uint8
-	ScheduleDeliveryTime string
-	ReplaceIfPresentFlag uint8
+	Name                 string                   `json:"name,omitempty"`
+	Slug                 string                   `json:"slug,omitempty"`
+	ID                   string                   `json:"id,omitempty"`
+	URL                  string                   `json:"url,omitempty"`
+	Auth                 Auth                     `json:"auth"`
+	ReadTimeout          time.Duration            `json:"read_timeout,omitempty"`
+	WriteTimeout         time.Duration            `json:"write_timeout,omitempty"`
+	EnquiryInterval      time.Duration            `json:"enquiry_interval,omitempty"`
+	EnquiryTimeout       time.Duration            `json:"enquiry_timeout,omitempty"`
+	MaxConnection        int                      `json:"max_connection,omitempty"`
+	Balancer             balancer.Balancer        `json:"balancer,omitempty"`
+	Throttle             int                      `json:"throttle,omitempty"`
+	UseAllConnection     bool                     `json:"use_all_connection,omitempty"`
+	HandlePDU            func(p pdu.Body)         `json:"handle_pdu,omitempty"`
+	AutoRebind           bool                     `json:"auto_rebind,omitempty"`
+	Validity             time.Duration            `json:"validity,omitempty"`
+	Register             pdufield.DeliverySetting `json:"register,omitempty"`
+	ServiceType          string                   `json:"service_type,omitempty"`
+	ESMClass             uint8                    `json:"esm_class,omitempty"`
+	ProtocolID           uint8                    `json:"protocol_id,omitempty"`
+	PriorityFlag         uint8                    `json:"priority_flag,omitempty"`
+	ScheduleDeliveryTime string                   `json:"schedule_delivery_time,omitempty"`
+	ReplaceIfPresentFlag uint8                    `json:"replace_if_present_flag,omitempty"`
 }
 
 type Manager struct {
@@ -66,8 +62,8 @@ type Manager struct {
 	Balancer               balancer.Balancer
 	connIDs                []string
 	mu                     sync.RWMutex
-	Messages               *xsync.MapOf[string, Message]
-	Parts                  *xsync.MapOf[string, Parts]
+	Messages               *maps.Map[string, Message]
+	Parts                  *maps.Map[string, Parts]
 	lastMessageTS          time.Time
 	lastDeliveredMessageTS time.Time
 }
@@ -80,7 +76,7 @@ type Message struct {
 	MessageID     string `json:"message_id,omitempty"`
 	MessageStatus string `json:"message_status,omitempty"`
 	Error         string `json:"error,omitempty"`
-	Parts         *xsync.MapOf[string, Parts]
+	Parts         *maps.Map[string, Parts]
 	MessageParts  []Parts
 }
 
@@ -93,27 +89,48 @@ type Parts struct {
 	Error         string `json:"error,omitempty"`
 }
 
+func DefaultPDUHandler(p pdu.Body) {
+	if msgStatus, ok := p.Fields()[pdufield.ShortMessage]; ok {
+		response := Unmarshal(msgStatus.String())
+		if _, ok := p.Manager().GetPart(response.Id); ok {
+			var status string
+			switch response.Stat {
+			case "DELIVRD":
+				status = "DELIVERED"
+				p.Manager().SetLastDeliveredMessage()
+				break
+			default:
+				status = response.Stat
+			}
+			p.Manager().UpdatePart(response.Id, status, response.Err)
+			p.Manager().DeletePart(response.Id)
+		}
+	}
+}
+
 func NewManager(setting Setting) (*Manager, error) {
 	var id string
-	if setting.MaxConnection == 0 {
-		setting.MaxConnection = 1
-	}
-	if setting.ReadTimeout == 0 {
-		setting.ReadTimeout = 10 * time.Second
-	}
-	if setting.WriteTimeout == 0 {
-		setting.WriteTimeout = 10 * time.Second
-	}
-	if setting.EnquiryInterval == 0 {
-		setting.EnquiryInterval = 10 * time.Second
-	}
-	if setting.EnquiryTimeout == 0 {
-		setting.EnquiryTimeout = 10 * time.Second
-	}
-	if setting.ID != "" {
-		id = setting.ID
-	} else {
-		id = xid.New().String()
+	{
+		if setting.MaxConnection == 0 {
+			setting.MaxConnection = 1
+		}
+		if setting.ReadTimeout == 0 {
+			setting.ReadTimeout = 10 * time.Second
+		}
+		if setting.WriteTimeout == 0 {
+			setting.WriteTimeout = 10 * time.Second
+		}
+		if setting.EnquiryInterval == 0 {
+			setting.EnquiryInterval = 10 * time.Second
+		}
+		if setting.EnquiryTimeout == 0 {
+			setting.EnquiryTimeout = 10 * time.Second
+		}
+		if setting.ID != "" {
+			id = setting.ID
+		} else {
+			id = xid.New().String()
+		}
 	}
 	manager := &Manager{
 		Name:        setting.Name,
@@ -121,29 +138,12 @@ func NewManager(setting Setting) (*Manager, error) {
 		ID:          id,
 		ctx:         context.Background(),
 		connections: make(map[string]*Transceiver),
-		Messages:    xsync.NewMapOf[Message](),
-		Parts:       xsync.NewMapOf[Parts](),
+		Messages:    maps.New[string, Message](),
+		Parts:       maps.New[string, Parts](),
 	}
 
 	if setting.HandlePDU == nil {
-		setting.HandlePDU = func(p pdu.Body) {
-			if msgStatus, ok := p.Fields()[pdufield.ShortMessage]; ok {
-				response := Unmarshal(msgStatus.String())
-				if _, ok := p.Manager().GetPart(response.Id); ok {
-					var status string
-					switch response.Stat {
-					case "DELIVRD":
-						status = "DELIVERED"
-						p.Manager().SetLastDeliveredMessage()
-						break
-					default:
-						status = response.Stat
-					}
-					p.Manager().UpdatePart(response.Id, status, response.Err)
-					p.Manager().DeletePart(response.Id)
-				}
-			}
-		}
+		setting.HandlePDU = DefaultPDUHandler
 	}
 	if setting.Balancer == nil {
 		manager.Balancer = &balancer.RoundRobin{}
@@ -234,24 +234,24 @@ func (m *Manager) Rebind() error {
 }
 
 func (m *Manager) GetPart(key string) (any, bool) {
-	return m.Parts.Load(key)
+	return m.Parts.Get(key)
 }
 
 func (m *Manager) UpdatePart(key, status, error string) {
-	if v, ok := m.Parts.Load(key); ok {
+	if v, ok := m.Parts.Get(key); ok {
 		v.MessageStatus = status
 		v.Error = error
-		m.Parts.Store(key, v)
-		if va, o := m.Messages.Load(v.SmsMessageID); o {
+		m.Parts.Set(key, v)
+		if va, o := m.Messages.Get(v.SmsMessageID); o {
 			v.MessageStatus = status
 			v.Error = error
-			va.Parts.Store(key, v)
+			va.Parts.Set(key, v)
 		}
 	}
 }
 
 func (m *Manager) DeletePart(key string) {
-	m.Parts.Delete(key)
+	m.Parts.Del(key)
 }
 
 func (m *Manager) LastMessageAt() time.Time {
@@ -273,12 +273,12 @@ func (m *Manager) GetMessages() (messages []any) {
 			parts = append(parts, part)
 			return true
 		}
-		val.Parts.Range(fp)
+		val.Parts.ForEach(fp)
 		val.MessageParts = parts
 		messages = append(messages, val)
 		return true
 	}
-	m.Messages.Range(f)
+	m.Messages.ForEach(f)
 	return
 }
 
@@ -316,7 +316,7 @@ func (m *Manager) SetupConnection() error {
 	}
 	go func() {
 		for c := range conn {
-			log.Println("SMPP connection status:", c.Status(), tx.ID)
+			log.Info().Str("conn_id", tx.ID).Str("conn_status", c.Status().String()).Msg("SMPP connection status")
 		}
 	}()
 	m.connIDs = append(m.connIDs, tx.ID)
@@ -365,7 +365,7 @@ func (m *Manager) Send(payload interface{}, connectionId ...string) (any, error)
 		sms.ID = xid.New().String()
 	}
 	if sms.Parts == nil {
-		sms.Parts = xsync.NewMapOf[Parts]()
+		sms.Parts = maps.New[string, Parts]()
 	}
 	encodedText, isLongMsg := pdutext.FindCoding([]byte(sms.Message))
 	srcTon, srcNpi := parseSrcPhone(sms.From)
@@ -391,13 +391,13 @@ func (m *Manager) Send(payload interface{}, connectionId ...string) (any, error)
 		ScheduleDeliveryTime: m.setting.ScheduleDeliveryTime,
 		ReplaceIfPresentFlag: m.setting.ReplaceIfPresentFlag,
 	}
-	m.Messages.Store(sms.ID, sms)
+	m.Messages.Set(sms.ID, sms)
 	m.lastMessageTS = time.Now()
 	if isLongMsg {
 		sm, err := tx.SubmitLongMsg(shortMessage)
 		if err != nil {
 			sms.MessageStatus = "Unable to send: " + err.Error()
-			m.Messages.Store(sms.ID, sms)
+			m.Messages.Set(sms.ID, sms)
 			return nil, err
 		}
 		for _, s := range sm {
@@ -412,16 +412,16 @@ func (m *Manager) Send(payload interface{}, connectionId ...string) (any, error)
 				msg.MessageStatus = "FAILED"
 				msg.Error = s.Resp().Header().Status.Error()
 			}
-			m.Parts.Store(msg.MessageID, msg)
-			if curSms, ok := m.Messages.Load(sms.ID); ok {
-				curSms.Parts.Store(msg.MessageID, msg)
+			m.Parts.Set(msg.MessageID, msg)
+			if curSms, ok := m.Messages.Get(sms.ID); ok {
+				curSms.Parts.Set(msg.MessageID, msg)
 			}
 		}
 	} else {
 		s, err := tx.Submit(shortMessage)
 		if err != nil {
 			sms.MessageStatus = "Unable to send: " + err.Error()
-			m.Messages.Store(sms.ID, sms)
+			m.Messages.Set(sms.ID, sms)
 			return nil, err
 		}
 		msg := Parts{
@@ -436,12 +436,12 @@ func (m *Manager) Send(payload interface{}, connectionId ...string) (any, error)
 			msg.MessageStatus = "FAILED"
 			msg.Error = s.Resp().Header().Status.Error()
 		}
-		m.Parts.Store(msg.MessageID, msg)
-		if curSms, ok := m.Messages.Load(sms.ID); ok {
-			curSms.Parts.Store(msg.MessageID, msg)
+		m.Parts.Set(msg.MessageID, msg)
+		if curSms, ok := m.Messages.Get(sms.ID); ok {
+			curSms.Parts.Set(msg.MessageID, msg)
 		}
 	}
-	curSms, _ := m.Messages.Load(sms.ID)
+	curSms, _ := m.Messages.Get(sms.ID)
 	return curSms, nil
 }
 
@@ -452,15 +452,15 @@ func (m *Manager) Close(connectionId ...string) error {
 			if err != nil {
 				return err
 			}
+			log.Info().Str("conn_id", con.ID).Msg("SMPP Connection Closing")
 		}
 	} else {
 		for _, conn := range m.connections {
 			err := conn.Close()
-			fmt.Println("closing")
 			if err != nil {
-				fmt.Println("error on closing")
 				return err
 			}
+			log.Info().Str("conn_id", conn.ID).Msg("SMPP Connection Closing")
 		}
 	}
 

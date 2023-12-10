@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/oarkflow/protocol/smpp"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
@@ -31,6 +32,6 @@ func main() {
 		}
 		manager.Send(msg)
 	}
-	// time.Sleep(5 * time.Second)
+	time.Sleep(5 * time.Second)
 	fmt.Println(manager.GetMessages())
 }
