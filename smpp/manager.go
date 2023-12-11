@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -107,21 +108,23 @@ const (
 func DefaultPDUHandler(p pdu.Body) {
 	if msgStatus, ok := p.Fields()[pdufield.ShortMessage]; ok {
 		response := Unmarshal(msgStatus.String())
+		if response == nil {
+			return
+		}
 		manager := p.Manager().(*Manager)
-		if part, ok := manager.parts.Get(response.ID); ok {
-			var status string
-			switch response.Stat {
+		id := response["id"]
+		status := response["stat"]
+		if part, ok := manager.parts.Get(id); ok {
+			switch status {
 			case "DELIVRD":
 				status = DELIVERED
 				manager.SetLastDeliveredMessage()
 				break
-			default:
-				status = response.Stat
 			}
 			part.MessageStatus = status
-			part.Error = response.Err
-			manager.parts.Set(response.ID, part)
-			if smsID, mExists := manager.messageParts.Get(response.ID); mExists {
+			part.Error = response["err"]
+			manager.parts.Set(id, part)
+			if smsID, mExists := manager.messageParts.Get(id); mExists {
 				if sms, exists := manager.messages.Get(smsID); exists {
 					sms.SentParts.Add(-1)
 					if status == DELIVERED {
@@ -476,6 +479,7 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 		}
 		m.messageParts.Set(s.RespID(), sms.ID)
 		m.parts.Set(msg.MessageID, msg)
+		m.messages.Set(sms.ID, sms)
 	}
 	curSms, _ := m.messages.Get(sms.ID)
 	return curSms, nil
@@ -569,6 +573,25 @@ func remove(s []string, r string) []string {
 	return s
 }
 
+var (
+	re = regexp.MustCompile(`id:(\w+) sub:(\d+) dlvrd:(\d+) submit date:(\d+) done date:(\d+) stat:(\w+) err:(\d+) text:(.+)`)
+)
+
+func Unmarshal(message string) map[string]string {
+	matches := re.FindStringSubmatch(message)
+	if len(matches) == 0 {
+		return nil
+	}
+	var resultMap = make(map[string]string)
+	keys := []string{"id", "sub", "dlvrd", "submit_date", "done_date", "stat", "err", "text"}
+	for i, key := range keys {
+		resultMap[key] = matches[i+1]
+	}
+	return resultMap
+}
+
+/*
+
 type GenericResponse struct {
 	ID         string `csv:"id" json:"id"`
 	Sub        string `csv:"sub" json:"sub"`
@@ -615,3 +638,5 @@ func Unmarshal(msg string) GenericResponse {
 	}
 	return response
 }
+
+*/
