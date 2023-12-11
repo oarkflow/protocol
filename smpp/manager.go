@@ -57,7 +57,7 @@ type Setting struct {
 	ScheduleDeliveryTime string                   `json:"schedule_delivery_time,omitempty"`
 	ReplaceIfPresentFlag uint8                    `json:"replace_if_present_flag,omitempty"`
 	HandlePDU            func(p pdu.Body)
-	OnMessageReport      func(manager *Manager, sms *Message)
+	OnMessageReport      func(manager *Manager, sms *Message, parts []*Part)
 }
 
 type Manager struct {
@@ -73,6 +73,7 @@ type Manager struct {
 	messages               *maps.Map[string, *Message]
 	parts                  *maps.Map[string, *Part]
 	messageParts           *maps.Map[string, string]
+	smsParts               *maps.Map[string, []string]
 	lastMessageTS          time.Time
 	lastDeliveredMessageTS time.Time
 }
@@ -144,7 +145,21 @@ func DefaultPDUHandler(p pdu.Body) {
 					}
 					manager.messages.Set(smsID, sms)
 					if sms.MessageStatus != "" && manager.setting.OnMessageReport != nil {
-						manager.setting.OnMessageReport(manager, sms)
+						smsParts, pExists := manager.smsParts.Get(smsID)
+						var parts []*Part
+						if pExists {
+							for _, p := range smsParts {
+								if part, e := manager.parts.Get(p); e {
+									parts = append(parts, part)
+								}
+							}
+						}
+						manager.setting.OnMessageReport(manager, sms, parts)
+						manager.messages.Del(smsID)
+						manager.smsParts.Del(smsID)
+						for _, p := range smsParts {
+							manager.parts.Del(p)
+						}
 					}
 				}
 			}
@@ -185,6 +200,7 @@ func NewManager(setting Setting) (*Manager, error) {
 		messages:     maps.New[string, *Message](),
 		parts:        maps.New[string, *Part](),
 		messageParts: maps.New[string, string](),
+		smsParts:     maps.New[string, []string](),
 	}
 
 	if setting.HandlePDU == nil {
@@ -452,6 +468,12 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 			}
 			m.messageParts.Set(s.RespID(), sms.ID)
 			m.parts.Set(msg.MessageID, msg)
+			if smsParts, s := m.smsParts.Get(sms.ID); s {
+				smsParts = append(smsParts, msg.MessageID)
+				m.smsParts.Set(sms.ID, smsParts)
+			} else {
+				m.smsParts.Set(sms.ID, []string{msg.MessageID})
+			}
 		}
 		m.messages.Set(sms.ID, sms)
 	} else {
@@ -480,6 +502,7 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 		m.messageParts.Set(s.RespID(), sms.ID)
 		m.parts.Set(msg.MessageID, msg)
 		m.messages.Set(sms.ID, sms)
+		m.smsParts.Set(sms.ID, []string{msg.MessageID})
 	}
 	curSms, _ := m.messages.Get(sms.ID)
 	return curSms, nil

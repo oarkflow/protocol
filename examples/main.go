@@ -18,8 +18,11 @@ func main() {
 			Password: "Ver!12@$",
 		},
 		Register: pdufield.FinalDeliveryReceipt,
-		OnMessageReport: func(manager *smpp.Manager, sms *smpp.Message) {
-			fmt.Println("Message Delivered")
+		OnMessageReport: func(manager *smpp.Manager, sms *smpp.Message, parts []*smpp.Part) {
+			fmt.Println(sms)
+			for _, part := range parts {
+				fmt.Println(part)
+			}
 		},
 	}
 	manager, err := smpp.NewManager(setting)
