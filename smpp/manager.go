@@ -57,6 +57,7 @@ type Setting struct {
 	ScheduleDeliveryTime string                   `json:"schedule_delivery_time,omitempty"`
 	ReplaceIfPresentFlag uint8                    `json:"replace_if_present_flag,omitempty"`
 	HandlePDU            func(p pdu.Body)
+	OnPartReport         func(manager *Manager, parts []*Part)
 	OnMessageReport      func(manager *Manager, sms *Message, parts []*Part)
 }
 
@@ -144,19 +145,10 @@ func DefaultPDUHandler(p pdu.Body) {
 						}
 					}
 					manager.messages.Set(smsID, sms)
-					if sms.MessageStatus != "" && manager.setting.OnMessageReport != nil {
-						smsParts, pExists := manager.smsParts.Get(smsID)
-						var parts []*Part
-						if pExists {
-							for _, p := range smsParts {
-								if part, e := manager.parts.Get(p); e {
-									parts = append(parts, part)
-								}
-							}
-						}
-						manager.setting.OnMessageReport(manager, sms, parts)
-						manager.messages.Del(smsID)
-						manager.smsParts.Del(smsID)
+					manager.Report(sms)
+					if smsParts, pExists := manager.smsParts.Get(sms.ID); pExists {
+						manager.messages.Del(sms.ID)
+						manager.smsParts.Del(sms.ID)
 						for _, p := range smsParts {
 							manager.parts.Del(p)
 						}
@@ -230,6 +222,21 @@ func (m *Manager) Start() error {
 		}
 	}
 	return nil
+}
+
+func (m *Manager) Report(sms *Message) {
+	if sms.MessageStatus != "" && m.setting.OnMessageReport != nil {
+		smsParts, pExists := m.smsParts.Get(sms.ID)
+		var parts []*Part
+		if pExists {
+			for _, p := range smsParts {
+				if part, e := m.parts.Get(p); e {
+					parts = append(parts, part)
+				}
+			}
+		}
+		m.setting.OnMessageReport(m, sms, parts)
+	}
 }
 
 func (m *Manager) AddConnection(noOfConnection ...int) error {
@@ -476,6 +483,7 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 			}
 		}
 		m.messages.Set(sms.ID, sms)
+		m.Report(sms)
 	} else {
 		s, err := tx.Submit(shortMessage)
 		if err != nil {
@@ -499,10 +507,12 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 			msg.Error = s.Resp().Header().Status.Error()
 			sms.FailedParts.Add(1)
 		}
+		sms.MessageStatus = "SENT"
 		m.messageParts.Set(s.RespID(), sms.ID)
 		m.parts.Set(msg.MessageID, msg)
 		m.messages.Set(sms.ID, sms)
 		m.smsParts.Set(sms.ID, []string{msg.MessageID})
+		m.Report(sms)
 	}
 	curSms, _ := m.messages.Get(sms.ID)
 	return curSms, nil

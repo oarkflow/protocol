@@ -19,7 +19,7 @@ func main() {
 		},
 		Register: pdufield.FinalDeliveryReceipt,
 		OnMessageReport: func(manager *smpp.Manager, sms *smpp.Message, parts []*smpp.Part) {
-			fmt.Println(sms)
+			fmt.Println("Message Report", sms)
 			for _, part := range parts {
 				fmt.Println(part)
 			}
