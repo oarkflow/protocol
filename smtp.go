@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+
 	"github.com/oarkflow/protocol/smtp"
 )
 
@@ -23,9 +24,9 @@ func (s *SMTP) GetType() Type {
 }
 
 func (s *SMTP) Handle(payload Payload) (Response, error) {
-	from := payload.FromEmail
-	if payload.From != "" {
-		from = fmt.Sprintf("%s<%s>", payload.From, from)
+	from := payload.From
+	if payload.FromName != "" {
+		from = fmt.Sprintf("%s<%s>", payload.FromName, from)
 	}
 	err := s.mailer.Send(smtp.Mail{
 		To:          []string{payload.To},

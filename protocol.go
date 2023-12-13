@@ -2,7 +2,9 @@ package protocol
 
 import (
 	"encoding/json"
+
 	"github.com/oarkflow/frame/server/render"
+
 	"github.com/oarkflow/protocol/http"
 	"github.com/oarkflow/protocol/smpp"
 	"github.com/oarkflow/protocol/smtp"
@@ -19,7 +21,7 @@ const (
 
 type Payload struct {
 	From             string                 `json:"from"`
-	FromEmail        string                 `json:"from_email"`
+	FromName         string                 `json:"from_name"`
 	To               string                 `json:"to"`
 	Message          string                 `json:"message"`
 	Subject          string                 `json:"subject"`
