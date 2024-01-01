@@ -7,11 +7,12 @@ package smpp
 import (
 	"crypto/tls"
 	"fmt"
+	"math/rand"
+	"time"
+
 	"github.com/oarkflow/protocol/smpp/manager"
 	"github.com/oarkflow/protocol/smpp/pdu"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
-	"math/rand"
-	"time"
 )
 
 // Transceiver implements an SMPP transceiver.

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/oarkflow/protocol/smpp"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
@@ -20,23 +21,26 @@ func main() {
 		Register: pdufield.FinalDeliveryReceipt,
 		OnMessageReport: func(manager *smpp.Manager, sms *smpp.Message, parts []*smpp.Part) {
 			fmt.Println("Message Report", sms)
-			for _, part := range parts {
-				fmt.Println(part)
-			}
 		},
 	}
 	manager, err := smpp.NewManager(setting)
 	if err != nil {
 		panic(err)
 	}
+	go func() {
 
-	for i := 0; i < 2; i++ {
-		msg := smpp.Message{
-			Message: fmt.Sprintf("This is test. %d", i),
-			To:      "9779856034616",
-			From:    "verishore",
+		for i := 0; i < 5; i++ {
+			<-time.After(20 * time.Second)
+			msg := smpp.Message{
+				Message: fmt.Sprintf("This is test. %d", i),
+				To:      "9779856034616",
+				From:    "verishore",
+			}
+			_, err := manager.Send(msg)
+			if err != nil {
+				fmt.Println(err.Error())
+			}
 		}
-		manager.Send(msg)
-	}
+	}()
 	manager.Wait()
 }

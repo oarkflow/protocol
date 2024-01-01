@@ -1,12 +1,13 @@
 package balancer
 
 import (
-	"github.com/oarkflow/errors"
 	"sync/atomic"
+
+	"github.com/oarkflow/errors"
 )
 
 var (
-	//ErrNoAvailableItem no item is available
+	// ErrNoAvailableItem no item is available
 	ErrNoAvailableItem = errors.New("no item is available")
 )
 

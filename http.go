@@ -2,13 +2,15 @@ package protocol
 
 import (
 	"fmt"
-	"github.com/oarkflow/errors"
-	"github.com/oarkflow/protocol/http"
 	"io"
 	"net"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/oarkflow/errors"
+
+	"github.com/oarkflow/protocol/http"
 )
 
 type HTTP struct {

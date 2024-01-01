@@ -3,10 +3,11 @@ package http
 import (
 	"context"
 	"crypto/x509"
-	"github.com/oarkflow/errors"
 	"net/http"
 	"net/url"
 	"regexp"
+
+	"github.com/oarkflow/errors"
 )
 
 var (

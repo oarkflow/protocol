@@ -5,10 +5,11 @@
 package pdu
 
 import (
+	"io"
+
 	"github.com/oarkflow/protocol/smpp/manager"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 	"github.com/oarkflow/protocol/smpp/pdu/pdutlv"
-	"io"
 )
 
 // MaxSize is the maximum size allowed for a PDU.

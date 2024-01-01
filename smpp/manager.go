@@ -68,6 +68,7 @@ type Manager struct {
 	ctx                    context.Context
 	setting                Setting
 	connections            map[string]*Transceiver
+	messagesToRetry        map[any]*Transceiver
 	balancer               balancer.Balancer
 	connIDs                []string
 	mu                     sync.RWMutex
@@ -184,15 +185,16 @@ func NewManager(setting Setting) (*Manager, error) {
 		}
 	}
 	manager := &Manager{
-		Name:         setting.Name,
-		Slug:         setting.Slug,
-		ID:           id,
-		ctx:          context.Background(),
-		connections:  make(map[string]*Transceiver),
-		messages:     maps.New[string, *Message](),
-		parts:        maps.New[string, *Part](),
-		messageParts: maps.New[string, string](),
-		smsParts:     maps.New[string, []string](),
+		Name:            setting.Name,
+		Slug:            setting.Slug,
+		ID:              id,
+		ctx:             context.Background(),
+		messagesToRetry: make(map[any]*Transceiver),
+		connections:     make(map[string]*Transceiver),
+		messages:        maps.New[string, *Message](),
+		parts:           maps.New[string, *Part](),
+		messageParts:    maps.New[string, string](),
+		smsParts:        maps.New[string, []string](),
 	}
 
 	if setting.HandlePDU == nil {
@@ -368,11 +370,31 @@ func (m *Manager) SetupConnection() error {
 	if status = <-conn; status.Error() != nil {
 		return status.Error()
 	}
-	go func() {
+	go func(m *Manager) {
 		for c := range conn {
-			log.Info().Str("conn_id", tx.ID).Str("conn_status", c.Status().String()).Msg("SMPP connection status")
+			info := log.Info().Str("conn_id", tx.ID).Str("conn_status", c.Status().String())
+			if c.Error() != nil {
+				info.Err(c.Error())
+			}
+			info.Msg("SMPP connection status")
+			if c.Status() == Connected && len(m.messagesToRetry) > 0 {
+				for payload, t := range m.messagesToRetry {
+					switch payload := payload.(type) {
+					case Message:
+						log.Info().Bool("resend", true).Str("message_id", payload.ID).Msg("Resending message")
+					case *Message:
+						log.Info().Bool("resend", true).Str("message_id", payload.ID).Msg("Resending message")
+					}
+					_, err := m.Send(payload, t.ID)
+					if err == nil {
+						m.mu.Lock()
+						delete(m.messagesToRetry, payload)
+						m.mu.Unlock()
+					}
+				}
+			}
 		}
-	}()
+	}(m)
 	m.connIDs = append(m.connIDs, tx.ID)
 	m.connections[tx.ID] = tx
 	return nil
@@ -451,6 +473,9 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 	if isLongMsg {
 		sm, err := tx.SubmitLongMsg(shortMessage)
 		if err != nil {
+			m.mu.Lock()
+			m.messagesToRetry[sms] = tx
+			m.mu.Unlock()
 			sms.MessageStatus = FAILED
 			sms.Error = err.Error()
 			m.messages.Set(sms.ID, sms)
@@ -482,11 +507,15 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 				m.smsParts.Set(sms.ID, []string{msg.MessageID})
 			}
 		}
+		sms.Error = ""
 		m.messages.Set(sms.ID, sms)
 		m.Report(sms)
 	} else {
 		s, err := tx.Submit(shortMessage)
 		if err != nil {
+			m.mu.Lock()
+			m.messagesToRetry[sms] = tx
+			m.mu.Unlock()
 			sms.MessageStatus = FAILED
 			sms.Error = err.Error()
 			m.messages.Set(sms.ID, sms)
@@ -507,6 +536,7 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 			msg.Error = s.Resp().Header().Status.Error()
 			sms.FailedParts.Add(1)
 		}
+		sms.Error = ""
 		sms.MessageStatus = "SENT"
 		m.messageParts.Set(s.RespID(), sms.ID)
 		m.parts.Set(msg.MessageID, msg)

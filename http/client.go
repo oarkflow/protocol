@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/hetiansu5/urlquery"
-	"github.com/oarkflow/errors"
 	"io"
 	"io/ioutil"
 	"log"
@@ -14,6 +12,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hetiansu5/urlquery"
+	"github.com/oarkflow/errors"
 )
 
 // Client is used to make HTTP requests. It adds additional functionality

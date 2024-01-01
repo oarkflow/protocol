@@ -6,12 +6,13 @@ package server
 
 import (
 	"encoding/hex"
-	"github.com/oarkflow/protocol/smpp/pdu"
-	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 	"log"
 	"math/rand"
 	"sync"
 	"sync/atomic"
+
+	"github.com/oarkflow/protocol/smpp/pdu"
+	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 )
 
 // DeliveryReceipt contains the arguments of RPC call to SM.Deliver.

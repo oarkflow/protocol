@@ -5,8 +5,9 @@
 package pdutext
 
 import (
-	"github.com/oarkflow/protocol/smpp/encoding"
 	"golang.org/x/text/transform"
+
+	"github.com/oarkflow/protocol/smpp/encoding"
 )
 
 // GSM 7-bit (packed)

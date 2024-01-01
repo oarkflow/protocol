@@ -9,10 +9,11 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
-	"github.com/oarkflow/protocol/smpp/pdu"
 	"io"
 	"net"
 	"sync"
+
+	"github.com/oarkflow/protocol/smpp/pdu"
 )
 
 var (

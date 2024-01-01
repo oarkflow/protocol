@@ -7,11 +7,12 @@ package pdu
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"sync/atomic"
+
 	"github.com/oarkflow/protocol/smpp/manager"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 	"github.com/oarkflow/protocol/smpp/pdu/pdutlv"
-	"io"
-	"sync/atomic"
 )
 
 var nextSeq uint32

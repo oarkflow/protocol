@@ -7,13 +7,14 @@ package smpp
 import (
 	"context"
 	"crypto/tls"
-	"github.com/oarkflow/protocol/smpp/manager"
-	"github.com/oarkflow/protocol/smpp/pdu"
-	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 	"io"
 	"math"
 	"sync"
 	"time"
+
+	"github.com/oarkflow/protocol/smpp/manager"
+	"github.com/oarkflow/protocol/smpp/pdu"
+	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 )
 
 // ConnStatus is an abstract interface for a connection status change.
@@ -114,10 +115,7 @@ func (c *client) init() {
 	if c.EnquireLink < 10*time.Second {
 		c.EnquireLink = 10 * time.Second
 	}
-
-	if c.EnquireLinkTimeout == 0 {
-		c.EnquireLinkTimeout = 3 * c.EnquireLink
-	}
+	c.EnquireLinkTimeout = 3 * c.EnquireLink
 }
 
 // Bind starts the connection manager and blocks until Close is called.

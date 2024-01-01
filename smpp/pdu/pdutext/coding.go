@@ -1,8 +1,9 @@
 package pdutext
 
 import (
-	"golang.org/x/text/unicode/rangetable"
 	"unicode"
+
+	"golang.org/x/text/unicode/rangetable"
 )
 
 var (
