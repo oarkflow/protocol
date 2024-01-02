@@ -372,18 +372,13 @@ func (m *Manager) SetupConnection() error {
 	}
 	go func(m *Manager) {
 		for c := range conn {
-			info := log.Info().Str("conn_id", tx.ID).Str("conn_status", c.Status().String())
-			if c.Error() != nil {
-				info.Err(c.Error())
-			}
-			info.Msg("SMPP connection status")
 			if c.Status() == Connected && len(m.messagesToRetry) > 0 {
 				for payload, t := range m.messagesToRetry {
 					switch payload := payload.(type) {
 					case Message:
-						log.Info().Bool("resend", true).Str("message_id", payload.ID).Msg("Resending message")
+						log.Warn().Bool("resend", true).Str("message_id", payload.ID).Msg("Resending message")
 					case *Message:
-						log.Info().Bool("resend", true).Str("message_id", payload.ID).Msg("Resending message")
+						log.Warn().Bool("resend", true).Str("message_id", payload.ID).Msg("Resending message")
 					}
 					_, err := m.Send(payload, t.ID)
 					if err == nil {
