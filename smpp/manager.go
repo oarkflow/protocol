@@ -81,17 +81,21 @@ type Manager struct {
 }
 
 type Message struct {
-	From           string       `json:"from,omitempty"`
-	To             string       `json:"to,omitempty"`
-	ID             string       `json:"id"`
-	Message        string       `json:"message,omitempty"`
-	MessageID      string       `json:"message_id,omitempty"`
-	MessageStatus  string       `json:"message_status,omitempty"`
-	Error          string       `json:"error,omitempty"`
-	TotalParts     atomic.Int32 `json:"total_parts"`
-	SentParts      atomic.Int32 `json:"sent_parts"`
-	FailedParts    atomic.Int32 `json:"failed_parts"`
-	DeliveredParts atomic.Int32 `json:"delivered_parts"`
+	From           string `json:"from,omitempty"`
+	To             string `json:"to,omitempty"`
+	ID             string `json:"id"`
+	Message        string `json:"message,omitempty"`
+	MessageID      string `json:"message_id,omitempty"`
+	MessageStatus  string `json:"message_status,omitempty"`
+	Error          string `json:"error,omitempty"`
+	TotalParts     int32  `json:"total_parts"`
+	SentParts      int32  `json:"sent_parts"`
+	FailedParts    int32  `json:"failed_parts"`
+	DeliveredParts int32  `json:"delivered_parts"`
+	totalParts     atomic.Int32
+	sentParts      atomic.Int32
+	failedParts    atomic.Int32
+	deliveredParts atomic.Int32
 }
 
 type Part struct {
@@ -129,15 +133,15 @@ func DefaultPDUHandler(p pdu.Body) {
 			manager.parts.Set(id, part)
 			if smsID, mExists := manager.messageParts.Get(id); mExists {
 				if sms, exists := manager.messages.Get(smsID); exists {
-					sms.SentParts.Add(-1)
+					sms.sentParts.Add(-1)
 					if status == DELIVERED {
-						sms.DeliveredParts.Add(1)
+						sms.deliveredParts.Add(1)
 					} else {
-						sms.FailedParts.Add(1)
+						sms.failedParts.Add(1)
 					}
-					totalParts := sms.TotalParts.Load()
-					failedParts := sms.FailedParts.Load()
-					deliveredParts := sms.DeliveredParts.Load()
+					totalParts := sms.totalParts.Load()
+					failedParts := sms.failedParts.Load()
+					deliveredParts := sms.deliveredParts.Load()
 					if totalParts == (failedParts + deliveredParts) {
 						if failedParts > 0 {
 							sms.MessageStatus = FAILED
@@ -237,6 +241,10 @@ func (m *Manager) Report(sms *Message) {
 				}
 			}
 		}
+		sms.TotalParts = sms.totalParts.Load()
+		sms.SentParts = sms.sentParts.Load()
+		sms.DeliveredParts = sms.deliveredParts.Load()
+		sms.FailedParts = sms.failedParts.Load()
 		m.setting.OnMessageReport(m, sms, parts)
 	}
 }
@@ -476,7 +484,7 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 			m.messages.Set(sms.ID, sms)
 			return nil, err
 		}
-		sms.TotalParts.Add(int32(len(sm)))
+		sms.totalParts.Add(int32(len(sm)))
 		m.lastMessageTS = time.Now()
 		for _, s := range sm {
 			msg := &Part{
@@ -487,11 +495,11 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 			}
 			if s.Resp().Header().Status == pdu.ESME_ROK {
 				msg.MessageStatus = "SENT"
-				sms.SentParts.Add(1)
+				sms.sentParts.Add(1)
 			} else {
 				msg.MessageStatus = "FAILED"
 				msg.Error = s.Resp().Header().Status.Error()
-				sms.FailedParts.Add(1)
+				sms.failedParts.Add(1)
 			}
 			m.messageParts.Set(s.RespID(), sms.ID)
 			m.parts.Set(msg.MessageID, msg)
@@ -516,7 +524,7 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 			m.messages.Set(sms.ID, sms)
 			return nil, err
 		}
-		sms.TotalParts.Add(1)
+		sms.totalParts.Add(1)
 		msg := &Part{
 			ID:           xid.New().String(),
 			SmsMessageID: sms.ID,
@@ -525,11 +533,11 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 		}
 		if s.Resp().Header().Status == pdu.ESME_ROK {
 			msg.MessageStatus = "SENT"
-			sms.SentParts.Add(1)
+			sms.sentParts.Add(1)
 		} else {
 			msg.MessageStatus = "FAILED"
 			msg.Error = s.Resp().Header().Status.Error()
-			sms.FailedParts.Add(1)
+			sms.failedParts.Add(1)
 		}
 		sms.Error = ""
 		sms.MessageStatus = "SENT"

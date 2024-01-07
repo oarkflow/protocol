@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/oarkflow/protocol/smpp"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
@@ -30,7 +29,6 @@ func main() {
 	go func() {
 
 		for i := 0; i < 5; i++ {
-			<-time.After(20 * time.Second)
 			msg := smpp.Message{
 				Message: fmt.Sprintf("This is test. %d", i),
 				To:      "9779856034616",
