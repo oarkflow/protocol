@@ -20,6 +20,7 @@ const (
 )
 
 type Payload struct {
+	ID               string                 `json:"id"`
 	From             string                 `json:"from"`
 	FromName         string                 `json:"from_name"`
 	To               string                 `json:"to"`

@@ -25,6 +25,7 @@ func (s *SMPP) Handle(payload Payload) (Response, error) {
 		To:      payload.To,
 		Message: payload.Message,
 		UserID:  payload.UserID,
+		ID:      payload.ID,
 	})
 }
 
