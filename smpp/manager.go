@@ -84,6 +84,7 @@ type Message struct {
 	From           string `json:"from,omitempty"`
 	To             string `json:"to,omitempty"`
 	ID             string `json:"id"`
+	UserID         any    `json:"user_id"`
 	Message        string `json:"message,omitempty"`
 	MessageID      string `json:"message_id,omitempty"`
 	MessageStatus  string `json:"message_status,omitempty"`
