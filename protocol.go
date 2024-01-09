@@ -23,6 +23,7 @@ type Payload struct {
 	From             string                 `json:"from"`
 	FromName         string                 `json:"from_name"`
 	To               string                 `json:"to"`
+	UserID           any                    `json:"user_id"`
 	Message          string                 `json:"message"`
 	Subject          string                 `json:"subject"`
 	Cc               string                 `json:"cc"`
