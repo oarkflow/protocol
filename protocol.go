@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/oarkflow/frame/server/render"
 
@@ -36,6 +37,10 @@ type Payload struct {
 	RequestStructure string                 `json:"request_structure"`
 	Data             map[string]interface{} `json:"data"`
 	Headers          map[string]string      `json:"headers"`
+	CreatedAt        time.Time              `json:"created_at"`
+	SentAt           time.Time              `json:"sent_at"`
+	DeliveredAt      time.Time              `json:"delivered_at"`
+	FailedAt         time.Time              `json:"failed_at"`
 }
 
 func (p *Payload) Prepare() (err error) {

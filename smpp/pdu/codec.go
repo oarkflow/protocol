@@ -10,7 +10,7 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/oarkflow/protocol/smpp/manager"
+	"github.com/oarkflow/protocol/interfaces"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 	"github.com/oarkflow/protocol/smpp/pdu/pdutlv"
 )
@@ -24,7 +24,7 @@ type codec struct {
 	l       pdufield.List
 	f       pdufield.Map
 	t       pdutlv.Map
-	manager manager.IManager
+	manager interfaces.IManager
 }
 
 // init initializes the codec's list and maps and sets the header
@@ -51,12 +51,12 @@ func (pdu *codec) Header() *Header {
 }
 
 // Manager implements the PDU interface.
-func (pdu *codec) Manager() manager.IManager {
+func (pdu *codec) Manager() interfaces.IManager {
 	return pdu.manager
 }
 
 // SetManager implements the PDU interface.
-func (pdu *codec) SetManager(manager manager.IManager) {
+func (pdu *codec) SetManager(manager interfaces.IManager) {
 	if pdu.manager == nil {
 		pdu.manager = manager
 	}

@@ -21,11 +21,15 @@ func (s *SMPP) SetService(service Service) {
 
 func (s *SMPP) Handle(payload Payload) (Response, error) {
 	return s.manager.Send(smpp.Message{
-		From:    payload.From,
-		To:      payload.To,
-		Message: payload.Message,
-		UserID:  payload.UserID,
-		ID:      payload.ID,
+		From:        payload.From,
+		To:          payload.To,
+		Message:     payload.Message,
+		UserID:      payload.UserID,
+		ID:          payload.ID,
+		CreatedAt:   payload.CreatedAt,
+		SentAt:      payload.SentAt,
+		FailedAt:    payload.FailedAt,
+		DeliveredAt: payload.DeliveredAt,
 	})
 }
 

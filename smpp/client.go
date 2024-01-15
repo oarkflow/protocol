@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/oarkflow/protocol/smpp/manager"
+	"github.com/oarkflow/protocol/interfaces"
 	"github.com/oarkflow/protocol/smpp/pdu"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 )
@@ -103,7 +103,7 @@ type client struct {
 	// time of the last received EnquireLinkResp
 	eliTime time.Time
 	eliMtx  sync.RWMutex
-	manager manager.IManager
+	manager interfaces.IManager
 }
 
 func (c *client) init() {

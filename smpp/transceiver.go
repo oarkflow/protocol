@@ -10,7 +10,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/oarkflow/protocol/smpp/manager"
+	"github.com/oarkflow/protocol/interfaces"
 	"github.com/oarkflow/protocol/smpp/pdu"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 )
@@ -32,7 +32,7 @@ type Transceiver struct {
 	Handler            HandlerFunc   // Receiver handler, optional.
 	RateLimiter        RateLimiter   // Rate limiter, optional.
 	WindowSize         uint
-	manager            manager.IManager
+	manager            interfaces.IManager
 
 	Transmitter
 }

@@ -7,7 +7,7 @@ package pdu
 import (
 	"io"
 
-	"github.com/oarkflow/protocol/smpp/manager"
+	"github.com/oarkflow/protocol/interfaces"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 	"github.com/oarkflow/protocol/smpp/pdu/pdutlv"
 )
@@ -41,7 +41,7 @@ type Body interface {
 	// the header and all fields.
 	SerializeTo(w io.Writer) error
 
-	Manager() manager.IManager
+	Manager() interfaces.IManager
 
-	SetManager(manager manager.IManager)
+	SetManager(manager interfaces.IManager)
 }

@@ -81,18 +81,22 @@ type Manager struct {
 }
 
 type Message struct {
-	From           string `json:"from,omitempty"`
-	To             string `json:"to,omitempty"`
-	ID             string `json:"id"`
-	UserID         any    `json:"user_id"`
-	Message        string `json:"message,omitempty"`
-	MessageID      string `json:"message_id,omitempty"`
-	MessageStatus  string `json:"message_status,omitempty"`
-	Error          string `json:"error,omitempty"`
-	TotalParts     int32  `json:"total_parts"`
-	SentParts      int32  `json:"sent_parts"`
-	FailedParts    int32  `json:"failed_parts"`
-	DeliveredParts int32  `json:"delivered_parts"`
+	From           string    `json:"from,omitempty"`
+	To             string    `json:"to,omitempty"`
+	ID             string    `json:"id"`
+	UserID         any       `json:"user_id"`
+	Message        string    `json:"message,omitempty"`
+	MessageID      string    `json:"message_id,omitempty"`
+	MessageStatus  string    `json:"message_status,omitempty"`
+	Error          string    `json:"error,omitempty"`
+	TotalParts     int32     `json:"total_parts"`
+	SentParts      int32     `json:"sent_parts"`
+	FailedParts    int32     `json:"failed_parts"`
+	DeliveredParts int32     `json:"delivered_parts"`
+	CreatedAt      time.Time `json:"created_at"`
+	SentAt         time.Time `json:"sent_at"`
+	DeliveredAt    time.Time `json:"delivered_at"`
+	FailedAt       time.Time `json:"failed_at"`
 	totalParts     atomic.Int32
 	sentParts      atomic.Int32
 	failedParts    atomic.Int32
@@ -100,12 +104,16 @@ type Message struct {
 }
 
 type Part struct {
-	ID            string `json:"id"`
-	SmsMessageID  string `json:"sms_message_id"`
-	Message       string `json:"message,omitempty"`
-	MessageID     string `json:"message_id,omitempty"`
-	MessageStatus string `json:"message_status,omitempty"`
-	Error         string `json:"error,omitempty"`
+	ID            string    `json:"id"`
+	SmsMessageID  string    `json:"sms_message_id"`
+	Message       string    `json:"message,omitempty"`
+	MessageID     string    `json:"message_id,omitempty"`
+	MessageStatus string    `json:"message_status,omitempty"`
+	Error         string    `json:"error,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	SentAt        time.Time `json:"sent_at"`
+	DeliveredAt   time.Time `json:"delivered_at"`
+	FailedAt      time.Time `json:"failed_at"`
 }
 
 const (
@@ -130,6 +138,7 @@ func DefaultPDUHandler(p pdu.Body) {
 				break
 			}
 			part.MessageStatus = status
+			part.DeliveredAt = time.Now()
 			part.Error = response["err"]
 			manager.parts.Set(id, part)
 			if smsID, mExists := manager.messageParts.Get(id); mExists {
@@ -146,8 +155,10 @@ func DefaultPDUHandler(p pdu.Body) {
 					if totalParts == (failedParts + deliveredParts) {
 						if failedParts > 0 {
 							sms.MessageStatus = FAILED
+							sms.FailedAt = time.Now()
 						} else {
 							sms.MessageStatus = DELIVERED
+							sms.DeliveredAt = time.Now()
 						}
 					}
 					manager.messages.Set(smsID, sms)
@@ -481,6 +492,7 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 			m.messagesToRetry[sms] = tx
 			m.mu.Unlock()
 			sms.MessageStatus = FAILED
+			sms.FailedAt = time.Now()
 			sms.Error = err.Error()
 			m.messages.Set(sms.ID, sms)
 			return nil, err
@@ -496,9 +508,11 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 			}
 			if s.Resp().Header().Status == pdu.ESME_ROK {
 				msg.MessageStatus = "SENT"
+				msg.SentAt = time.Now()
 				sms.sentParts.Add(1)
 			} else {
 				msg.MessageStatus = "FAILED"
+				msg.FailedAt = time.Now()
 				msg.Error = s.Resp().Header().Status.Error()
 				sms.failedParts.Add(1)
 			}
@@ -521,6 +535,7 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 			m.messagesToRetry[sms] = tx
 			m.mu.Unlock()
 			sms.MessageStatus = FAILED
+			sms.FailedAt = time.Now()
 			sms.Error = err.Error()
 			m.messages.Set(sms.ID, sms)
 			return nil, err
@@ -534,14 +549,17 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 		}
 		if s.Resp().Header().Status == pdu.ESME_ROK {
 			msg.MessageStatus = "SENT"
+			msg.SentAt = time.Now()
 			sms.sentParts.Add(1)
 		} else {
 			msg.MessageStatus = "FAILED"
+			msg.FailedAt = time.Now()
 			msg.Error = s.Resp().Header().Status.Error()
 			sms.failedParts.Add(1)
 		}
 		sms.Error = ""
 		sms.MessageStatus = "SENT"
+		sms.SentAt = time.Now()
 		m.messageParts.Set(s.RespID(), sms.ID)
 		m.parts.Set(msg.MessageID, msg)
 		m.messages.Set(sms.ID, sms)

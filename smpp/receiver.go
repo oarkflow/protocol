@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/oarkflow/protocol/smpp/manager"
+	"github.com/oarkflow/protocol/interfaces"
 	"github.com/oarkflow/protocol/smpp/pdu"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 )
@@ -31,7 +31,7 @@ type Receiver struct {
 	TLS                  *tls.Config
 	Handler              HandlerFunc
 	SkipAutoRespondIDs   []pdu.ID
-	manager              manager.IManager
+	manager              interfaces.IManager
 	chanClose            chan struct{}
 
 	// struct which holds the map of MergeHolders for the merging of the long incoming messages.

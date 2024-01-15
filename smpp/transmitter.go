@@ -15,7 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/oarkflow/protocol/smpp/manager"
+	"github.com/oarkflow/protocol/interfaces"
 	"github.com/oarkflow/protocol/smpp/pdu"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 	"github.com/oarkflow/protocol/smpp/pdu/pdutext"
@@ -46,7 +46,7 @@ type Transmitter struct {
 	WindowSize         uint
 	rMutex             sync.Mutex
 	r                  *rand.Rand
-	manager            manager.IManager
+	manager            interfaces.IManager
 	cl                 struct {
 		sync.Mutex
 		*client

@@ -5,7 +5,7 @@
 package pdu
 
 import (
-	"github.com/oarkflow/protocol/smpp/manager"
+	"github.com/oarkflow/protocol/interfaces"
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 	"github.com/oarkflow/protocol/smpp/pdu/pdutlv"
 )
@@ -49,7 +49,7 @@ func newGenericNACK(hdr *Header) *codec {
 }
 
 // NewGenericNACK creates and initializes a GenericNACK PDU.
-func NewGenericNACK(manager manager.IManager) Body {
+func NewGenericNACK(manager interfaces.IManager) Body {
 	b := newGenericNACK(&Header{ID: GenericNACKID})
 	b.manager = manager
 	b.init()
@@ -74,7 +74,7 @@ func newBind(hdr *Header) *codec {
 }
 
 // NewBindReceiver creates a new Bind PDU.
-func NewBindReceiver(manager manager.IManager) Body {
+func NewBindReceiver(manager interfaces.IManager) Body {
 	b := newBind(&Header{ID: BindReceiverID})
 	b.manager = manager
 	b.init()
@@ -82,7 +82,7 @@ func NewBindReceiver(manager manager.IManager) Body {
 }
 
 // NewBindTransceiver creates a new Bind PDU.
-func NewBindTransceiver(manager manager.IManager) Body {
+func NewBindTransceiver(manager interfaces.IManager) Body {
 	b := newBind(&Header{ID: BindTransceiverID})
 	b.manager = manager
 	b.init()
@@ -90,7 +90,7 @@ func NewBindTransceiver(manager manager.IManager) Body {
 }
 
 // NewBindTransmitter creates a new Bind PDU.
-func NewBindTransmitter(manager manager.IManager) Body {
+func NewBindTransmitter(manager interfaces.IManager) Body {
 	b := newBind(&Header{ID: BindTransmitterID})
 	b.manager = manager
 	b.init()
@@ -108,7 +108,7 @@ func newBindResp(hdr *Header) *codec {
 }
 
 // NewBindReceiverResp creates and initializes a new BindResp PDU.
-func NewBindReceiverResp(manager manager.IManager) Body {
+func NewBindReceiverResp(manager interfaces.IManager) Body {
 	b := newBindResp(&Header{ID: BindReceiverRespID})
 	b.manager = manager
 	b.init()
@@ -116,7 +116,7 @@ func NewBindReceiverResp(manager manager.IManager) Body {
 }
 
 // NewBindTransceiverResp creates and initializes a new BindResp PDU.
-func NewBindTransceiverResp(manager manager.IManager) Body {
+func NewBindTransceiverResp(manager interfaces.IManager) Body {
 	b := newBindResp(&Header{ID: BindTransceiverRespID})
 	b.manager = manager
 	b.init()
@@ -124,7 +124,7 @@ func NewBindTransceiverResp(manager manager.IManager) Body {
 }
 
 // NewBindTransmitterResp creates and initializes a new BindResp PDU.
-func NewBindTransmitterResp(manager manager.IManager) Body {
+func NewBindTransmitterResp(manager interfaces.IManager) Body {
 	b := newBindResp(&Header{ID: BindTransmitterRespID})
 	b.manager = manager
 	b.init()
@@ -164,7 +164,7 @@ func newCancelSM(hdr *Header) *codec {
 }
 
 // NewCancelSM creates and initializes a new CancelSM PDU.
-func NewCancelSM(manager manager.IManager) Body {
+func NewCancelSM(manager interfaces.IManager) Body {
 	b := newCancelSM(&Header{ID: CancelSMID})
 	b.manager = manager
 	b.init()
@@ -178,7 +178,7 @@ func newCancelSMResp(hdr *Header) *codec {
 	return &codec{h: hdr}
 }
 
-func NewCancelSMResp(manager manager.IManager) Body {
+func NewCancelSMResp(manager interfaces.IManager) Body {
 	b := newCancelSMResp(&Header{ID: CancelSMRespID})
 	b.manager = manager
 	b.init()
@@ -206,7 +206,7 @@ func newReplaceSM(hdr *Header) *codec {
 	}
 }
 
-func NewReplaceSM(manager manager.IManager) Body {
+func NewReplaceSM(manager interfaces.IManager) Body {
 	b := newReplaceSM(&Header{ID: ReplaceSMID})
 	b.manager = manager
 	b.init()
@@ -253,7 +253,7 @@ func newQuerySM(hdr *Header) *codec {
 }
 
 // NewQuerySM creates and initializes a new QuerySM PDU.
-func NewQuerySM(manager manager.IManager) Body {
+func NewQuerySM(manager interfaces.IManager) Body {
 	b := newQuerySM(&Header{ID: QuerySMID})
 	b.manager = manager
 	b.init()
@@ -276,7 +276,7 @@ func newQuerySMResp(hdr *Header) *codec {
 }
 
 // NewQuerySMResp creates and initializes a new QuerySMResp PDU.
-func NewQuerySMResp(manager manager.IManager) Body {
+func NewQuerySMResp(manager interfaces.IManager) Body {
 	b := newQuerySMResp(&Header{ID: QuerySMRespID})
 	b.manager = manager
 	b.init()
@@ -315,7 +315,7 @@ func newSubmitSM(hdr *Header) *codec {
 }
 
 // NewSubmitSM creates and initializes a new SubmitSM PDU.
-func NewSubmitSM(fields pdutlv.Fields, manager manager.IManager) Body {
+func NewSubmitSM(fields pdutlv.Fields, manager interfaces.IManager) Body {
 	b := newSubmitSM(&Header{ID: SubmitSMID})
 	b.manager = manager
 	b.init()
@@ -338,7 +338,7 @@ func newSubmitSMResp(hdr *Header) *codec {
 }
 
 // NewSubmitSMResp creates and initializes a new SubmitSMResp PDU.
-func NewSubmitSMResp(manager manager.IManager) Body {
+func NewSubmitSMResp(manager interfaces.IManager) Body {
 	b := newSubmitSMResp(&Header{ID: SubmitSMRespID})
 	b.manager = manager
 	b.init()
@@ -367,7 +367,7 @@ func newDataSM(hdr *Header) *codec {
 }
 
 // NewDataSM creates and initializes a new DataSM PDU.
-func NewDataSM(fields pdutlv.Fields, manager manager.IManager) Body {
+func NewDataSM(fields pdutlv.Fields, manager interfaces.IManager) Body {
 	b := newDataSM(&Header{ID: DataSMID})
 	b.manager = manager
 	b.init()
@@ -391,7 +391,7 @@ func newDataSMResp(hdr *Header) *codec {
 }
 
 // NewDataSMResp creates and initializes a new NewDataSMResp PDU.
-func NewDataSMResp(manager manager.IManager) Body {
+func NewDataSMResp(manager interfaces.IManager) Body {
 	b := newDataSMResp(&Header{ID: DataSMRespID})
 	b.manager = manager
 	b.init()
@@ -427,7 +427,7 @@ func newSubmitMulti(hdr *Header) *codec {
 }
 
 // NewSubmitMulti creates and initializes a new SubmitMulti PDU.
-func NewSubmitMulti(fields pdutlv.Fields, manager manager.IManager) Body {
+func NewSubmitMulti(fields pdutlv.Fields, manager interfaces.IManager) Body {
 	b := newSubmitMulti(&Header{ID: SubmitMultiID})
 	b.manager = manager
 	b.init()
@@ -452,7 +452,7 @@ func newSubmitMultiResp(hdr *Header) *codec {
 }
 
 // NewSubmitMultiResp creates and initializes a new SubmitMultiResp PDU.
-func NewSubmitMultiResp(manager manager.IManager) Body {
+func NewSubmitMultiResp(manager interfaces.IManager) Body {
 	b := newSubmitMultiResp(&Header{ID: SubmitMultiRespID})
 	b.manager = manager
 	b.init()
@@ -489,7 +489,7 @@ func newDeliverSM(hdr *Header) *codec {
 }
 
 // NewDeliverSM creates and initializes a new DeliverSM PDU.
-func NewDeliverSM(manager manager.IManager) Body {
+func NewDeliverSM(manager interfaces.IManager) Body {
 	b := newDeliverSM(&Header{ID: DeliverSMID})
 	b.manager = manager
 	b.init()
@@ -509,7 +509,7 @@ func newDeliverSMResp(hdr *Header) *codec {
 }
 
 // NewDeliverSMResp creates and initializes a new DeliverSMResp PDU.
-func NewDeliverSMResp(manager manager.IManager) Body {
+func NewDeliverSMResp(manager interfaces.IManager) Body {
 	b := newDeliverSMResp(&Header{ID: DeliverSMRespID})
 	b.manager = manager
 	b.init()
@@ -517,7 +517,7 @@ func NewDeliverSMResp(manager manager.IManager) Body {
 }
 
 // NewDeliverSMRespSeq creates and initializes a new DeliverSMResp PDU for a specific seq.
-func NewDeliverSMRespSeq(seq uint32, manager manager.IManager) Body {
+func NewDeliverSMRespSeq(seq uint32, manager interfaces.IManager) Body {
 	b := newDeliverSMResp(&Header{ID: DeliverSMRespID, Seq: seq})
 	b.manager = manager
 	b.init()
@@ -532,7 +532,7 @@ func newUnbind(hdr *Header) *codec {
 }
 
 // NewUnbind creates and initializes a Unbind PDU.
-func NewUnbind(manager manager.IManager) Body {
+func NewUnbind(manager interfaces.IManager) Body {
 	b := newUnbind(&Header{ID: UnbindID})
 	b.manager = manager
 	b.init()
@@ -547,7 +547,7 @@ func newUnbindResp(hdr *Header) *codec {
 }
 
 // NewUnbindResp creates and initializes a UnbindResp PDU.
-func NewUnbindResp(manager manager.IManager) Body {
+func NewUnbindResp(manager interfaces.IManager) Body {
 	b := newUnbindResp(&Header{ID: UnbindRespID})
 	b.manager = manager
 	b.init()
@@ -562,7 +562,7 @@ func newEnquireLink(hdr *Header) *codec {
 }
 
 // NewEnquireLink creates and initializes a EnquireLink PDU.
-func NewEnquireLink(manager manager.IManager) Body {
+func NewEnquireLink(manager interfaces.IManager) Body {
 	b := newEnquireLink(&Header{ID: EnquireLinkID})
 	b.manager = manager
 	b.init()
@@ -577,7 +577,7 @@ func newEnquireLinkResp(hdr *Header) *codec {
 }
 
 // NewEnquireLinkResp creates and initializes a EnquireLinkResp PDU.
-func NewEnquireLinkResp(manager manager.IManager) Body {
+func NewEnquireLinkResp(manager interfaces.IManager) Body {
 	b := newEnquireLinkResp(&Header{ID: EnquireLinkRespID})
 	b.manager = manager
 	b.init()
@@ -585,7 +585,7 @@ func NewEnquireLinkResp(manager manager.IManager) Body {
 }
 
 // NewEnquireLinkRespSeq creates and initializes a EnquireLinkResp PDU for a specific seq.
-func NewEnquireLinkRespSeq(seq uint32, manager manager.IManager) Body {
+func NewEnquireLinkRespSeq(seq uint32, manager interfaces.IManager) Body {
 	b := newEnquireLinkResp(&Header{ID: EnquireLinkRespID, Seq: seq})
 	b.manager = manager
 	b.init()
