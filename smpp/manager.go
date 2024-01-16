@@ -121,63 +121,6 @@ const (
 	FAILED    string = "FAILED"
 )
 
-func DefaultPDUHandler(p pdu.Body) {
-	if msgStatus, ok := p.Fields()[pdufield.ShortMessage]; ok {
-		response := Unmarshal(msgStatus.String())
-		if response == nil {
-			return
-		}
-		manager := p.Manager().(*Manager)
-		id := response["id"]
-		status := response["stat"]
-		if part, ok := manager.parts.Get(id); ok {
-			switch status {
-			case "DELIVRD":
-				status = DELIVERED
-				manager.SetLastDeliveredMessage()
-				break
-			}
-			part.MessageStatus = status
-			part.DeliveredAt = time.Now()
-			part.Error = response["err"]
-			manager.parts.Set(id, part)
-			if smsID, mExists := manager.messageParts.Get(id); mExists {
-				if sms, exists := manager.messages.Get(smsID); exists {
-					sms.sentParts.Add(-1)
-					if status == DELIVERED {
-						sms.deliveredParts.Add(1)
-					} else {
-						sms.failedParts.Add(1)
-					}
-					totalParts := sms.totalParts.Load()
-					failedParts := sms.failedParts.Load()
-					deliveredParts := sms.deliveredParts.Load()
-					deleteAll := false
-					if totalParts == (failedParts + deliveredParts) {
-						deleteAll = true
-						if failedParts > 0 {
-							sms.MessageStatus = FAILED
-							sms.FailedAt = time.Now()
-						} else {
-							sms.MessageStatus = DELIVERED
-							sms.DeliveredAt = time.Now()
-						}
-					}
-					manager.messages.Set(smsID, sms)
-					manager.Report(sms)
-					if smsParts, pExists := manager.smsParts.Get(sms.ID); pExists && deleteAll {
-						manager.messages.Del(sms.ID)
-						manager.smsParts.Del(sms.ID)
-						for _, p := range smsParts {
-							manager.parts.Del(p)
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
 func NewManager(setting Setting) (*Manager, error) {
 	var id string
 	{
@@ -216,13 +159,69 @@ func NewManager(setting Setting) (*Manager, error) {
 	}
 
 	if setting.HandlePDU == nil {
-		setting.HandlePDU = DefaultPDUHandler
+		setting.HandlePDU = manager.DefaultPDUHandler
 	}
 	if setting.Balancer == nil {
 		manager.balancer = &balancer.RoundRobin{}
 	}
 	manager.setting = setting
 	return manager, nil
+}
+
+func (m *Manager) DefaultPDUHandler(p pdu.Body) {
+	if msgStatus, ok := p.Fields()[pdufield.ShortMessage]; ok {
+		response := Unmarshal(msgStatus.String())
+		if response == nil {
+			return
+		}
+		id := response["id"]
+		status := response["stat"]
+		if part, ok := m.parts.Get(id); ok {
+			switch status {
+			case "DELIVRD":
+				status = DELIVERED
+				m.SetLastDeliveredMessage()
+				break
+			}
+			part.MessageStatus = status
+			part.DeliveredAt = time.Now()
+			part.Error = response["err"]
+			m.parts.Set(id, part)
+			if smsID, mExists := m.messageParts.Get(id); mExists {
+				if sms, exists := m.messages.Get(smsID); exists {
+					sms.sentParts.Add(-1)
+					if status == DELIVERED {
+						sms.deliveredParts.Add(1)
+					} else {
+						sms.failedParts.Add(1)
+					}
+					totalParts := sms.totalParts.Load()
+					failedParts := sms.failedParts.Load()
+					deliveredParts := sms.deliveredParts.Load()
+					deleteAll := false
+					if totalParts == (failedParts + deliveredParts) {
+						deleteAll = true
+						if failedParts > 0 {
+							sms.MessageStatus = FAILED
+							sms.FailedAt = time.Now()
+						} else {
+							sms.MessageStatus = DELIVERED
+							sms.DeliveredAt = time.Now()
+						}
+					}
+					m.messages.Set(smsID, sms)
+					m.Report(sms)
+					if smsParts, pExists := m.smsParts.Get(sms.ID); pExists && deleteAll {
+						m.messages.Del(sms.ID)
+						m.smsParts.Del(sms.ID)
+						for _, p := range smsParts {
+							m.parts.Del(p)
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 func (m *Manager) Start() error {
@@ -569,7 +568,6 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 		m.messages.Set(sms.ID, sms)
 		m.smsParts.Set(sms.ID, []string{part.MessageID})
 		m.Report(sms)
-		fmt.Println(m.parts.Get(part.MessageID))
 	}
 	curSms, _ := m.messages.Get(sms.ID)
 	return curSms, nil
