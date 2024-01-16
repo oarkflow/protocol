@@ -152,7 +152,9 @@ func DefaultPDUHandler(p pdu.Body) {
 					totalParts := sms.totalParts.Load()
 					failedParts := sms.failedParts.Load()
 					deliveredParts := sms.deliveredParts.Load()
+					deleteAll := false
 					if totalParts == (failedParts + deliveredParts) {
+						deleteAll = true
 						if failedParts > 0 {
 							sms.MessageStatus = FAILED
 							sms.FailedAt = time.Now()
@@ -163,7 +165,7 @@ func DefaultPDUHandler(p pdu.Body) {
 					}
 					manager.messages.Set(smsID, sms)
 					manager.Report(sms)
-					if smsParts, pExists := manager.smsParts.Get(sms.ID); pExists {
+					if smsParts, pExists := manager.smsParts.Get(sms.ID); pExists && deleteAll {
 						manager.messages.Del(sms.ID)
 						manager.smsParts.Del(sms.ID)
 						for _, p := range smsParts {
@@ -207,10 +209,10 @@ func NewManager(setting Setting) (*Manager, error) {
 		ctx:             context.Background(),
 		messagesToRetry: make(map[any]*Transceiver),
 		connections:     make(map[string]*Transceiver),
-		messages:        maps.New[string, *Message](),
-		parts:           maps.New[string, *Part](),
-		messageParts:    maps.New[string, string](),
-		smsParts:        maps.New[string, []string](),
+		messages:        maps.New[string, *Message](10000),
+		parts:           maps.New[string, *Part](10000),
+		messageParts:    maps.New[string, string](10000),
+		smsParts:        maps.New[string, []string](10000),
 	}
 
 	if setting.HandlePDU == nil {
@@ -495,34 +497,35 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 			sms.FailedAt = time.Now()
 			sms.Error = err.Error()
 			m.messages.Set(sms.ID, sms)
+			m.Report(sms)
 			return nil, err
 		}
 		sms.totalParts.Add(int32(len(sm)))
 		m.lastMessageTS = time.Now()
 		for _, s := range sm {
-			msg := &Part{
+			part := &Part{
 				ID:           xid.New().String(),
 				SmsMessageID: sms.ID,
 				Message:      str.FromByte(s.Text.Decode()),
 				MessageID:    s.RespID(),
 			}
 			if s.Resp().Header().Status == pdu.ESME_ROK {
-				msg.MessageStatus = "SENT"
-				msg.SentAt = time.Now()
+				part.MessageStatus = "SENT"
+				part.SentAt = time.Now()
 				sms.sentParts.Add(1)
 			} else {
-				msg.MessageStatus = "FAILED"
-				msg.FailedAt = time.Now()
-				msg.Error = s.Resp().Header().Status.Error()
+				part.MessageStatus = "FAILED"
+				part.FailedAt = time.Now()
+				part.Error = s.Resp().Header().Status.Error()
 				sms.failedParts.Add(1)
 			}
 			m.messageParts.Set(s.RespID(), sms.ID)
-			m.parts.Set(msg.MessageID, msg)
+			m.parts.Set(part.MessageID, part)
 			if smsParts, s := m.smsParts.Get(sms.ID); s {
-				smsParts = append(smsParts, msg.MessageID)
+				smsParts = append(smsParts, part.MessageID)
 				m.smsParts.Set(sms.ID, smsParts)
 			} else {
-				m.smsParts.Set(sms.ID, []string{msg.MessageID})
+				m.smsParts.Set(sms.ID, []string{part.MessageID})
 			}
 		}
 		sms.Error = ""
@@ -538,33 +541,35 @@ func (m *Manager) Send(payload any, connectionId ...string) (any, error) {
 			sms.FailedAt = time.Now()
 			sms.Error = err.Error()
 			m.messages.Set(sms.ID, sms)
+			m.Report(sms)
 			return nil, err
 		}
 		sms.totalParts.Add(1)
-		msg := &Part{
+		part := &Part{
 			ID:           xid.New().String(),
 			SmsMessageID: sms.ID,
 			Message:      string(s.Text.Encode()),
 			MessageID:    s.RespID(),
 		}
 		if s.Resp().Header().Status == pdu.ESME_ROK {
-			msg.MessageStatus = "SENT"
-			msg.SentAt = time.Now()
+			part.MessageStatus = "SENT"
+			part.SentAt = time.Now()
 			sms.sentParts.Add(1)
 		} else {
-			msg.MessageStatus = "FAILED"
-			msg.FailedAt = time.Now()
-			msg.Error = s.Resp().Header().Status.Error()
+			part.MessageStatus = "FAILED"
+			part.FailedAt = time.Now()
+			part.Error = s.Resp().Header().Status.Error()
 			sms.failedParts.Add(1)
 		}
 		sms.Error = ""
 		sms.MessageStatus = "SENT"
 		sms.SentAt = time.Now()
 		m.messageParts.Set(s.RespID(), sms.ID)
-		m.parts.Set(msg.MessageID, msg)
+		m.parts.Set(part.MessageID, part)
 		m.messages.Set(sms.ID, sms)
-		m.smsParts.Set(sms.ID, []string{msg.MessageID})
+		m.smsParts.Set(sms.ID, []string{part.MessageID})
 		m.Report(sms)
+		fmt.Println(m.parts.Get(part.MessageID))
 	}
 	curSms, _ := m.messages.Get(sms.ID)
 	return curSms, nil
