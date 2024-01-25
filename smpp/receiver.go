@@ -31,6 +31,7 @@ type Receiver struct {
 	TLS                  *tls.Config
 	Handler              HandlerFunc
 	SkipAutoRespondIDs   []pdu.ID
+	ObserveEnquireLink   func(float64)
 	manager              interfaces.IManager
 	chanClose            chan struct{}
 
@@ -88,6 +89,7 @@ func (r *Receiver) Bind() <-chan ConnStatus {
 		Status:             make(chan ConnStatus, 1),
 		BindFunc:           r.bindFunc,
 		BindInterval:       r.BindInterval,
+		ObserveEnquireLink: r.ObserveEnquireLink,
 	}
 	r.cl.client = c
 

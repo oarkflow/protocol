@@ -56,6 +56,55 @@ func NewGenericNACK(manager interfaces.IManager) Body {
 	return b
 }
 
+// NewGenericNACKSeq creates and initializes a new GenericNACK PDU for a specific seq.
+func NewGenericNACKSeq(seq uint32) Body {
+	b := newGenericNACK(&Header{ID: GenericNACKID, Seq: seq})
+	b.init()
+	return b
+}
+
+// NewBindReceiverRespSeq creates and initializes a new BindResp PDU for a specific seq.
+func NewBindReceiverRespSeq(seq uint32) Body {
+	b := newBindResp(&Header{ID: BindReceiverRespID, Seq: seq})
+	b.init()
+	return b
+}
+
+// NewBindTransceiverRespSeq creates and initializes a new BindResp PDU for a specific seq.
+func NewBindTransceiverRespSeq(seq uint32) Body {
+	b := newBindResp(&Header{ID: BindTransceiverRespID, Seq: seq})
+	b.init()
+	return b
+}
+
+// NewBindTransmitterRespSeq creates and initializes a new BindResp PDU for a specific seq.
+func NewBindTransmitterRespSeq(seq uint32) Body {
+	b := newBindResp(&Header{ID: BindTransmitterRespID, Seq: seq})
+	b.init()
+	return b
+}
+
+// NewQuerySMRespSeq creates and initializes a new QuerySMResp PDU for a specific seq.
+func NewQuerySMRespSeq(seq uint32) Body {
+	b := newQuerySMResp(&Header{ID: QuerySMRespID, Seq: seq})
+	b.init()
+	return b
+}
+
+// NewSubmitSMRespSeq creates and initializes a new SubmitSMResp PDU for a specific seq.
+func NewSubmitSMRespSeq(seq uint32) Body {
+	b := newSubmitSMResp(&Header{ID: SubmitSMRespID, Seq: seq})
+	b.init()
+	return b
+}
+
+// NewSubmitMultiRespSeq creates and initializes a new SubmitMultiResp PDU for a specific seq.
+func NewSubmitMultiRespSeq(seq uint32) Body {
+	b := newSubmitMultiResp(&Header{ID: SubmitMultiRespID, Seq: seq})
+	b.init()
+	return b
+}
+
 // Bind PDU.
 type Bind struct{ *codec }
 

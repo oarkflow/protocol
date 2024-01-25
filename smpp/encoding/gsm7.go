@@ -208,7 +208,9 @@ func (g *gsm7Decoder) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, er
 			remain = len(src) - count
 		}
 	}
-
+	if g.packed && len(septets)%8 == 0 && septets[len(septets)-1] == 0x0d {
+		septets = septets[:len(septets)-1]
+	}
 	nSeptet := 0
 	builder := bytes.NewBufferString("")
 	for nSeptet < len(septets) {
@@ -271,6 +273,7 @@ func (g *gsm7Encoder) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, er
 	}
 
 	nDst = len(septets)
+	unpackedLen := nDst
 	if g.packed {
 		nDst = int(math.Ceil(float64(len(septets)) * 7 / 8))
 	}
@@ -353,6 +356,13 @@ func (g *gsm7Encoder) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, er
 			break
 		}
 		remain = len(septets) - nSeptet
+	}
+	// When there are 7 spare bits in the last octet of a message, these bits are set to the 7-bit code of the CR control
+	// (also used as a padding filler) instead of being set to zero (where they would be confused with the 7-bit code of an '@' character).
+	if g.packed && (unpackedLen*7)%8 == 1 {
+		if v := dst[nDst-1]; v == 0x01 || v == 0x00 {
+			dst[nDst-1] = v | 0x0d<<1
+		}
 	}
 	return nDst, nSrc, err
 }

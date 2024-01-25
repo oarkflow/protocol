@@ -89,6 +89,7 @@ loop:
 			case ESMClass:
 				mask := byte(1 << 6)
 				udhiFlag = mask == b&mask
+				f[UDHFlag] = &Flag{Data: udhiFlag}
 			}
 		case UDHLength:
 			if !udhiFlag {

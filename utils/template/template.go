@@ -12,7 +12,7 @@ type Template struct {
 	Suffix      string `json:"suffix"`
 }
 
-func (t *Template) Parse(data map[string]interface{}) string {
+func (t *Template) Parse(data map[string]any) string {
 	content := t.Content
 	for k, v := range data {
 		content = strings.ReplaceAll(content, t.Prefix+k+t.Suffix, fmt.Sprintf("%v", v))

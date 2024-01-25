@@ -59,6 +59,7 @@ func (t *Transceiver) Bind() <-chan ConnStatus {
 		WindowSize:         t.WindowSize,
 		RateLimiter:        t.RateLimiter,
 		BindInterval:       t.BindInterval,
+		ObserveEnquireLink: t.ObserveEnquireLink,
 		manager:            t.manager,
 	}
 	t.cl.client = c

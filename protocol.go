@@ -21,26 +21,26 @@ const (
 )
 
 type Payload struct {
-	ID               string                 `json:"id"`
-	From             string                 `json:"from"`
-	FromName         string                 `json:"from_name"`
-	To               string                 `json:"to"`
-	UserID           any                    `json:"user_id"`
-	Message          string                 `json:"message"`
-	Subject          string                 `json:"subject"`
-	Cc               string                 `json:"cc"`
-	Query            string                 `json:"query"`
-	Attachments      []smtp.Attachment      `json:"attachments"`
-	CallbackURL      string                 `json:"callback_url"`
-	URL              string                 `json:"url"`
-	Method           string                 `json:"method"`
-	RequestStructure string                 `json:"request_structure"`
-	Data             map[string]interface{} `json:"data"`
-	Headers          map[string]string      `json:"headers"`
-	CreatedAt        time.Time              `json:"created_at"`
-	SentAt           time.Time              `json:"sent_at"`
-	DeliveredAt      time.Time              `json:"delivered_at"`
-	FailedAt         time.Time              `json:"failed_at"`
+	ID               string            `json:"id"`
+	From             string            `json:"from"`
+	FromName         string            `json:"from_name"`
+	To               string            `json:"to"`
+	UserID           any               `json:"user_id"`
+	Message          string            `json:"message"`
+	Subject          string            `json:"subject"`
+	Cc               string            `json:"cc"`
+	Query            string            `json:"query"`
+	Attachments      []smtp.Attachment `json:"attachments"`
+	CallbackURL      string            `json:"callback_url"`
+	URL              string            `json:"url"`
+	Method           string            `json:"method"`
+	RequestStructure string            `json:"request_structure"`
+	Data             map[string]any    `json:"data"`
+	Headers          map[string]string `json:"headers"`
+	CreatedAt        time.Time         `json:"created_at"`
+	SentAt           time.Time         `json:"sent_at"`
+	DeliveredAt      time.Time         `json:"delivered_at"`
+	FailedAt         time.Time         `json:"failed_at"`
 }
 
 func (p *Payload) Prepare() (err error) {
@@ -50,7 +50,7 @@ func (p *Payload) Prepare() (err error) {
 			return
 		}
 	} else if p.Data != nil && p.RequestStructure != "" {
-		var data map[string]interface{}
+		var data map[string]any
 		tmp := template.New(p.RequestStructure, "", "")
 		p.RequestStructure = tmp.Parse(p.Data)
 		err = json.Unmarshal([]byte(p.RequestStructure), &data)
@@ -65,7 +65,7 @@ func (p *Payload) Prepare() (err error) {
 	return
 }
 
-type Response interface{}
+type Response any
 
 type Service interface {
 	Setup() error

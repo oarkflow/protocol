@@ -15,7 +15,7 @@ type Map map[Tag]Body
 // returns error if the value cannot be converted to type Data.
 //
 // This is a shortcut for m[t] = NewTLV(t, v) converting v properly.
-func (m Map) Set(t Tag, v interface{}) error {
+func (m Map) Set(t Tag, v any) error {
 	switch v.(type) {
 	case nil:
 		m[t] = NewTLV(t, nil) // use default value

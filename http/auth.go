@@ -5,14 +5,14 @@ type Auth interface {
 }
 
 type BasicAuth struct {
-	URL         string                 `json:"url"`
-	Method      string                 `json:"method"`
-	Username    string                 `json:"username"`
-	Password    string                 `json:"password"`
-	TokenField  string                 `json:"token_field"`
-	ExpiryField string                 `json:"expiry_field"`
-	Data        map[string]interface{} `json:"data"`
-	Headers     map[string]string      `json:"headers"`
+	URL         string            `json:"url"`
+	Method      string            `json:"method"`
+	Username    string            `json:"username"`
+	Password    string            `json:"password"`
+	TokenField  string            `json:"token_field"`
+	ExpiryField string            `json:"expiry_field"`
+	Data        map[string]any    `json:"data"`
+	Headers     map[string]string `json:"headers"`
 }
 
 func (a *BasicAuth) GetCredentials() Auth {
@@ -29,15 +29,15 @@ func (a *BearerToken) GetCredentials() Auth {
 }
 
 type OAuth2 struct {
-	URL         string                 `json:"url"`
-	Method      string                 `json:"method"`
-	ClientID    string                 `json:"client_id"`
-	Secret      string                 `json:"secret"`
-	GrantType   string                 `json:"grant_type"`
-	TokenField  string                 `json:"token_field"`
-	ExpiryField string                 `json:"expiry_field"`
-	Data        map[string]interface{} `json:"data"`
-	Headers     map[string]string      `json:"headers"`
+	URL         string            `json:"url"`
+	Method      string            `json:"method"`
+	ClientID    string            `json:"client_id"`
+	Secret      string            `json:"secret"`
+	GrantType   string            `json:"grant_type"`
+	TokenField  string            `json:"token_field"`
+	ExpiryField string            `json:"expiry_field"`
+	Data        map[string]any    `json:"data"`
+	Headers     map[string]string `json:"headers"`
 }
 
 func (a *OAuth2) GetCredentials() Auth {

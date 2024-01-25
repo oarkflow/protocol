@@ -11,7 +11,7 @@ import (
 )
 
 // Fields is a map of tagged TLV fields
-type Fields map[Tag]interface{}
+type Fields map[Tag]any
 
 // String is a text string that is not null-terminated.
 type String string
@@ -91,7 +91,7 @@ func (t *Field) Len() int {
 }
 
 // Raw implements the Data interface.
-func (t *Field) Raw() interface{} {
+func (t *Field) Raw() any {
 	return t.Bytes()
 }
 

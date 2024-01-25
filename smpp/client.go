@@ -93,6 +93,7 @@ type client struct {
 	BindInterval       time.Duration
 	WindowSize         uint
 	RateLimiter        RateLimiter
+	ObserveEnquireLink func(float64)
 
 	// internal stuff.
 	inbox chan pdu.Body
@@ -208,6 +209,10 @@ func (c *client) enquireLink(stop chan struct{}) {
 
 func (c *client) updateEliTime() {
 	c.eliMtx.Lock()
+	if c.ObserveEnquireLink != nil {
+		ts := time.Since(c.eliTime).Milliseconds()
+		c.ObserveEnquireLink(float64(ts))
+	}
 	c.eliTime = time.Now()
 	c.eliMtx.Unlock()
 }

@@ -20,7 +20,7 @@ type Map map[Name]Body
 //
 // If k is ShortMessage and v is of type pdutext.Codec, text is
 // encoded and data_coding PDU and sm_length PDUs are set.
-func (m Map) Set(k Name, v interface{}) error {
+func (m Map) Set(k Name, v any) error {
 	switch v.(type) {
 	case nil:
 		m[k] = New(k, nil) // use default value

@@ -9,7 +9,7 @@ import "io"
 // Body is an interface for manipulating binary PDU field data.
 type Body interface {
 	Len() int
-	Raw() interface{}
+	Raw() any
 	String() string
 	Bytes() []byte
 	SerializeTo(w io.Writer) error

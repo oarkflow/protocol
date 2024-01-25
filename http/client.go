@@ -64,12 +64,12 @@ type Options struct {
 	RateLimiter      <-chan time.Time
 	Auth             Auth
 	Headers          map[string]string
-	AuthType         string                 `json:"auth_type"`
-	URL              string                 `json:"url"`
-	Method           string                 `json:"method"`
-	Data             map[string]interface{} `json:"data"`
-	DataField        string                 `json:"data_field"`
-	ResponseCallback func(response []byte, dataField ...string) (interface{}, error)
+	AuthType         string         `json:"auth_type"`
+	URL              string         `json:"url"`
+	Method           string         `json:"method"`
+	Data             map[string]any `json:"data"`
+	DataField        string         `json:"data_field"`
+	ResponseCallback func(response []byte, dataField ...string) (any, error)
 	MU               *sync.RWMutex
 }
 
@@ -171,7 +171,7 @@ func (c *Client) AddHeader(key, value string) {
 }
 
 // Get is a convenience helper for doing simple GET requests.
-func (c *Client) Get(url string, body interface{}, headers ...map[string]string) (*http.Response, error) {
+func (c *Client) Get(url string, body any, headers ...map[string]string) (*http.Response, error) {
 	var err error
 	if body != nil {
 		bts, err := urlquery.Marshal(body)
@@ -188,7 +188,7 @@ func (c *Client) Get(url string, body interface{}, headers ...map[string]string)
 }
 
 // Post is a convenience method for doing simple POST requests.
-func (c *Client) Post(url string, body interface{}, headers ...map[string]string) (*http.Response, error) {
+func (c *Client) Post(url string, body any, headers ...map[string]string) (*http.Response, error) {
 	var err error
 	body, headers, err = prepareHeaderContentType(body, headers, map[string]string{"Content-Type": "application/json"})
 	if err != nil {
@@ -198,7 +198,7 @@ func (c *Client) Post(url string, body interface{}, headers ...map[string]string
 }
 
 // Put is a convenience method for doing simple POST requests.
-func (c *Client) Put(url string, body interface{}, headers ...map[string]string) (*http.Response, error) {
+func (c *Client) Put(url string, body any, headers ...map[string]string) (*http.Response, error) {
 	var err error
 	body, headers, err = prepareHeaderContentType(body, headers, map[string]string{"Content-Type": "application/json"})
 	if err != nil {
@@ -208,7 +208,7 @@ func (c *Client) Put(url string, body interface{}, headers ...map[string]string)
 }
 
 // PutForm is a convenience method for doing simple POST requests.
-func (c *Client) PutForm(url string, body interface{}, headers ...map[string]string) (*http.Response, error) {
+func (c *Client) PutForm(url string, body any, headers ...map[string]string) (*http.Response, error) {
 	var err error
 	body, headers, err = prepareHeaderContentType(body, headers, map[string]string{"Content-Type": "application/x-www-form-urlencoded"})
 	if err != nil {
@@ -219,7 +219,7 @@ func (c *Client) PutForm(url string, body interface{}, headers ...map[string]str
 
 // Form is a convenience method for doing simple POST operations using
 // pre-filled url.Values form data.
-func (c *Client) Form(url string, body interface{}, headers ...map[string]string) (*http.Response, error) {
+func (c *Client) Form(url string, body any, headers ...map[string]string) (*http.Response, error) {
 	var err error
 	body, headers, err = prepareHeaderContentType(body, headers, map[string]string{"Content-Type": "application/x-www-form-urlencoded"})
 	if err != nil {
@@ -238,7 +238,7 @@ func (c *Client) Head(url string, headers ...map[string]string) (*http.Response,
 	return c.Request(http.MethodHead, url, nil, headers...)
 }
 
-func (c *Client) Request(method string, url string, body interface{}, headers ...map[string]string) (*http.Response, error) {
+func (c *Client) Request(method string, url string, body any, headers ...map[string]string) (*http.Response, error) {
 	req, err := NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
@@ -375,7 +375,7 @@ func (c *Client) closeIdleConnections() {
 	}
 }
 
-func prepareHeaderContentType(body interface{}, headers []map[string]string, head map[string]string) ([]byte, []map[string]string, error) {
+func prepareHeaderContentType(body any, headers []map[string]string, head map[string]string) ([]byte, []map[string]string, error) {
 	for _, header := range headers {
 		for key, val := range header {
 			if strings.ToLower(key) == "content-type" {

@@ -44,6 +44,7 @@ type Transmitter struct {
 	TLS                *tls.Config   // TLS client settings, optional.
 	RateLimiter        RateLimiter   // Rate limiter, optional.
 	WindowSize         uint
+	ObserveEnquireLink func(float64) // Include metrics
 	rMutex             sync.Mutex
 	r                  *rand.Rand
 	manager            interfaces.IManager
@@ -89,6 +90,7 @@ func (t *Transmitter) Bind() <-chan ConnStatus {
 		WindowSize:         t.WindowSize,
 		RateLimiter:        t.RateLimiter,
 		BindInterval:       t.BindInterval,
+		ObserveEnquireLink: t.ObserveEnquireLink,
 		manager:            t.manager,
 	}
 	t.cl.client = c
@@ -460,7 +462,11 @@ func (t *Transmitter) SubmitLongMsg(sm *ShortMessage) ([]ShortMessage, error) {
 	maxLen := 133 // 140-7 (UDH with 2 byte reference number)
 	switch sm.Text.(type) {
 	case pdutext.GSM7:
-		maxLen = 152 // to avoid an escape character being split between payloads
+		if sm.UDHLen == 6 {
+			maxLen = 153 // to avoid an escape character being split between payloads
+		} else {
+			maxLen = 152 // to avoid an escape character being split between payloads
+		}
 		break
 	case pdutext.GSM7Packed:
 		maxLen = 132 // to avoid an escape character being split between payloads

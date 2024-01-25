@@ -66,7 +66,7 @@ type ErrorHandler func(resp *http.Response, err error, numTries int) (*http.Resp
 type ReaderFunc func() (io.Reader, error)
 
 // NewRequest creates a new wrapped request.
-func NewRequest(method, url string, body interface{}) (*Request, error) {
+func NewRequest(method, url string, body any) (*Request, error) {
 	bodyReader, contentLength, err := getBodyReaderAndContentLength(body)
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func NewRequest(method, url string, body interface{}) (*Request, error) {
 }
 
 // NewRequestWithContext creates a new wrapped request with context
-func NewRequestWithContext(ctx context.Context, method, url string, body interface{}) (*Request, error) {
+func NewRequestWithContext(ctx context.Context, method, url string, body any) (*Request, error) {
 	bodyReader, contentLength, err := getBodyReaderAndContentLength(body)
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func (r *Request) BodyBytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func getBodyReaderAndContentLength(rawBody interface{}) (ReaderFunc, int64, error) {
+func getBodyReaderAndContentLength(rawBody any) (ReaderFunc, int64, error) {
 	var bodyReader ReaderFunc
 	var contentLength int64
 

@@ -16,6 +16,6 @@ type IManager interface {
 	LastDeliveredMessageAt() time.Time
 	SetLastDeliveredMessage()
 	Rebind() error
-	Send(payload interface{}, connectionID ...string) (any, error)
+	Send(payload any, connectionID ...string) (any, error)
 	Close(connectionID ...string) error
 }
