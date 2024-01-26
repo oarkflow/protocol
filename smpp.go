@@ -5,6 +5,7 @@ import "github.com/oarkflow/protocol/smpp"
 type SMPP struct {
 	manager *smpp.Manager
 	Config  smpp.Setting
+	Service string
 }
 
 func (s *SMPP) Setup() error {
@@ -17,6 +18,10 @@ func (s *SMPP) GetType() Type {
 
 func (s *SMPP) SetService(service Service) {
 
+}
+
+func (s *SMPP) GetServiceType() string {
+	return s.Service
 }
 
 func (s *SMPP) Handle(payload Payload) (Response, error) {

@@ -70,23 +70,24 @@ type Response any
 type Service interface {
 	Setup() error
 	GetType() Type
+	GetServiceType() string
 	SetService(service Service)
 	Handle(payload Payload) (Response, error)
 	Queue(payload Payload) (Response, error)
 }
 
-func NewSMTP(config smtp.Config, engine *render.HtmlEngine) (*SMTP, error) {
-	return &SMTP{mailer: smtp.New(config, engine), Config: config}, nil
+func NewSMTP(config smtp.Config, engine *render.HtmlEngine, serviceType string) (*SMTP, error) {
+	return &SMTP{mailer: smtp.New(config, engine), Config: config, Service: serviceType}, nil
 }
 
-func NewHTTP(config *http.Options) (*HTTP, error) {
-	return &HTTP{client: http.NewClient(config), Config: config}, nil
+func NewHTTP(config *http.Options, serviceType string) (*HTTP, error) {
+	return &HTTP{client: http.NewClient(config), Config: config, Service: serviceType}, nil
 }
 
-func NewSMPP(config smpp.Setting) (*SMPP, error) {
+func NewSMPP(config smpp.Setting, serviceType string) (*SMPP, error) {
 	manager, err := smpp.NewManager(config)
 	if err != nil {
 		return nil, err
 	}
-	return &SMPP{manager: manager, Config: config}, nil
+	return &SMPP{manager: manager, Config: config, Service: serviceType}, nil
 }

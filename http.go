@@ -14,8 +14,9 @@ import (
 )
 
 type HTTP struct {
-	client *http.Client
-	Config *http.Options
+	client  *http.Client
+	Config  *http.Options
+	Service string
 }
 
 func (s *HTTP) Setup() error {
@@ -44,6 +45,10 @@ func (s *HTTP) GetType() Type {
 
 func (s *HTTP) SetService(service Service) {
 
+}
+
+func (s *HTTP) GetServiceType() string {
+	return s.Service
 }
 
 func (s *HTTP) Queue(payload Payload) (Response, error) {

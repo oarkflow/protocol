@@ -7,8 +7,9 @@ import (
 )
 
 type SMTP struct {
-	mailer *smtp.Mailer
-	Config smtp.Config
+	mailer  *smtp.Mailer
+	Config  smtp.Config
+	Service string
 }
 
 func (s *SMTP) Setup() error {
@@ -21,6 +22,10 @@ func (s *SMTP) SetService(service Service) {
 
 func (s *SMTP) GetType() Type {
 	return Smtp
+}
+
+func (s *SMTP) GetServiceType() string {
+	return s.Service
 }
 
 func (s *SMTP) Handle(payload Payload) (Response, error) {
