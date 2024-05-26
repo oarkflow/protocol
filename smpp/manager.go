@@ -16,7 +16,6 @@ import (
 
 	"github.com/oarkflow/errors"
 	"github.com/oarkflow/log"
-	"github.com/oarkflow/pkg/str"
 	"golang.org/x/time/rate"
 
 	"github.com/oarkflow/protocol/smpp/balancer"
@@ -24,6 +23,7 @@ import (
 	"github.com/oarkflow/protocol/smpp/pdu/pdufield"
 	"github.com/oarkflow/protocol/smpp/pdu/pdutext"
 	"github.com/oarkflow/protocol/utils/maps"
+	"github.com/oarkflow/protocol/utils/str"
 	"github.com/oarkflow/protocol/utils/xid"
 )
 

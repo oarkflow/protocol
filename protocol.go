@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/oarkflow/frame/server/render"
+	"github.com/oarkflow/render"
 
 	"github.com/oarkflow/protocol/http"
 	"github.com/oarkflow/protocol/smpp"

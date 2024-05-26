@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"github.com/oarkflow/errors"
-	"github.com/oarkflow/frame/pkg/common/bytebufferpool"
-	"github.com/oarkflow/frame/pkg/common/utils"
-	"github.com/oarkflow/frame/server/render"
 	"github.com/oarkflow/log/fqdn"
+	"github.com/oarkflow/render"
 
 	"github.com/oarkflow/log"
 	sMail "github.com/xhit/go-simple-mail/v2"
+
+	"github.com/oarkflow/protocol/bytebufferpool"
 )
 
 var maxBigInt = big.NewInt(math.MaxInt64)
@@ -126,7 +126,7 @@ func (m *Mailer) Send(msg Mail) error {
 	return nil
 }
 
-func (m *Mailer) View(view string, body utils.H) *Body {
+func (m *Mailer) View(view string, body map[string]any) *Body {
 	buf := bytebufferpool.Get()
 	defer bytebufferpool.Put(buf)
 	if err := m.Render(buf, view, body, m.Config.EmailLayout); err != nil {
@@ -136,7 +136,7 @@ func (m *Mailer) View(view string, body utils.H) *Body {
 	return bodyContent
 }
 
-func (m *Mailer) Html(view string, body utils.H) string {
+func (m *Mailer) Html(view string, body map[string]any) string {
 	buf := bytebufferpool.Get()
 	defer bytebufferpool.Put(buf)
 	if err := m.Render(buf, view, body, DefaultMailer.Config.EmailLayout); err != nil {
@@ -145,12 +145,12 @@ func (m *Mailer) Html(view string, body utils.H) string {
 	return buf.String()
 }
 
-func View(view string, body utils.H) *Body {
+func View(view string, body map[string]any) *Body {
 	bodyContent := &Body{Content: Html(view, body)}
 	return bodyContent
 }
 
-func Html(view string, body utils.H) string {
+func Html(view string, body map[string]any) string {
 	buf := bytebufferpool.Get()
 	defer bytebufferpool.Put(buf)
 	if err := DefaultMailer.Render(buf, view, body, DefaultMailer.Config.EmailLayout); err != nil {
